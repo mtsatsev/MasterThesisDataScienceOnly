@@ -108,6 +108,9 @@ class LikelihoodBasedEstimator(BaseEstimator):
         entity: str,
     ) -> list[ProblogAtom]:
         scored_predicates = []
+        if not predicates:
+            return scored_predicates
+
         if isinstance(predicates[0], tuple):
             for atom, negated_atom in predicates:
                 probability = self.prob_contrastive(atom, negated_atom, entity)
@@ -116,10 +119,9 @@ class LikelihoodBasedEstimator(BaseEstimator):
                         atom=atom.atom,
                         probability=probability,
                         context=atom.context,
-                        cluster_id=atom.cluster_id,
                     )
                 )
-        if isinstance(predicates[0], ProblogAtom):
+        elif isinstance(predicates[0], ProblogAtom):
             for atom in predicates:
                 probability = self.perplexity(atom, entity)
                 scored_predicates.append(
@@ -127,7 +129,6 @@ class LikelihoodBasedEstimator(BaseEstimator):
                         atom=atom.atom,
                         probability=probability,
                         context=atom.context,
-                        cluster_id=atom.cluster_id,
                     )
                 )
         return scored_predicates

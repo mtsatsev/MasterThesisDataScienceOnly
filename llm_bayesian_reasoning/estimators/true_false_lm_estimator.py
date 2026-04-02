@@ -1,5 +1,6 @@
-import torch
 import logging
+
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
@@ -89,16 +90,26 @@ class TrueFalseLLMEstimator(BaseEstimator):
             # Let accelerate handle device placement automatically
             inputs = self.tokenizer(prompt, return_tensors="pt")
             # Move directly to model's device (detected automatically)
-            inputs = {k: v.to(next(self.model.parameters()).device) for k, v in inputs.items()}
+            inputs = {
+                k: v.to(next(self.model.parameters()).device) for k, v in inputs.items()
+            }
             with torch.no_grad():
                 outputs = self.model(**inputs)
             logits = outputs.logits[0, -1]
 
-            true_token_ids = self.tokenizer.encode(self.true_token, add_special_tokens=False)
-            false_token_ids = self.tokenizer.encode(self.false_token, add_special_tokens=False)
+            true_token_ids = self.tokenizer.encode(
+                self.true_token, add_special_tokens=False
+            )
+            false_token_ids = self.tokenizer.encode(
+                self.false_token, add_special_tokens=False
+            )
 
             if not true_token_ids or not false_token_ids:
-                logger.debug("True/False tokenization produced empty ids for tokens: %r / %r", self.true_token, self.false_token)
+                logger.debug(
+                    "True/False tokenization produced empty ids for tokens: %r / %r",
+                    self.true_token,
+                    self.false_token,
+                )
                 return 0.0, 0.0
 
             true_token_id = true_token_ids[0]
@@ -108,7 +119,9 @@ class TrueFalseLLMEstimator(BaseEstimator):
             true_logit = float(logits[true_token_id].item())
             false_logit = float(logits[false_token_id].item())
 
-            probs = torch.nn.functional.softmax(torch.tensor([true_logit, false_logit]), dim=0)
+            probs = torch.nn.functional.softmax(
+                torch.tensor([true_logit, false_logit]), dim=0
+            )
             t_prob, f_prob = float(probs[0].item()), float(probs[1].item())
 
             logger.debug(
@@ -124,7 +137,9 @@ class TrueFalseLLMEstimator(BaseEstimator):
 
             return t_prob, f_prob
         except Exception as exc:  # noqa: BLE001
-            logging.getLogger(__name__).warning("Failed to compute token probabilities: %s", exc)
+            logging.getLogger(__name__).warning(
+                "Failed to compute token probabilities: %s", exc
+            )
             return 0.0, 0.0
 
     def score_probability(
@@ -149,8 +164,13 @@ class TrueFalseLLMEstimator(BaseEstimator):
             t_prob, f_prob = self.get_probability_for_prompt(prompt)
             # if both probabilities zero, warn once with prompt sample
             if t_prob == 0.0 and f_prob == 0.0:
-                logger.debug("LLM returned zero probs for prompt sample: %r", (prompt[:200] + "...") if len(prompt) > 200 else prompt)
+                logger.debug(
+                    "LLM returned zero probs for prompt sample: %r",
+                    (prompt[:200] + "...") if len(prompt) > 200 else prompt,
+                )
             results.append(
-                ProblogAtom(atom=predicate.atom, probability=t_prob, context=predicate.context)
+                ProblogAtom(
+                    atom=predicate.atom, probability=t_prob, context=predicate.context
+                )
             )
         return results
