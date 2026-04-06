@@ -204,9 +204,7 @@ class ProblogFormula(BaseModel):
         standard rule syntax so the logical structure stays identical.
         """
         entity_str = entity if entity is not None else "{X}"
-        propositions = "\n".join(
-            atom.to_deepproblog_fact(entity) for atom in atoms
-        )
+        propositions = "\n".join(atom.to_deepproblog_fact(entity) for atom in atoms)
         formula_rule = self.problog_formula_format.replace("{X}", f"{entity_str!r}")
         query_directive = f"query({self.head}({entity_str!r}))."
         return propositions + "\n" + formula_rule + "\n" + query_directive

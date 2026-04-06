@@ -276,7 +276,9 @@ def run_pipeline(
 
             try:
                 query: str = record["query"]
-                atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]] = record["atoms"]
+                atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]] = (
+                    record["atoms"]
+                )
                 formula: ProblogFormula = record["problog_formula"]
 
                 # --- Step 1: BM25 retrieval (top-N) ---
@@ -306,7 +308,9 @@ def run_pipeline(
                             document.text,
                         )
                     try:
-                        scored_atoms = estimator.score_probability(scoring_atoms, entity)
+                        scored_atoms = estimator.score_probability(
+                            scoring_atoms, entity
+                        )
                         prob = logic_backend.evaluate(scored_atoms, formula, entity)
                     except Exception:  # noqa: BLE001
                         logger.exception(
@@ -371,7 +375,7 @@ def run_pipeline(
                         # Structured per-query table row
                         row: dict = {
                             "record_id": [record_id],
-                                "logic_backend": config.logic_backend.value,
+                            "logic_backend": config.logic_backend.value,
                             "query": [query],
                             "model": [config.estimator_config.model_name],
                             "ground_truth": [
