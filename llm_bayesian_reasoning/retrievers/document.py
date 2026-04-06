@@ -16,6 +16,19 @@ class Document(BaseModel):
     text: str
 
 
+class ScoredDocument(Document):
+    """Represents a retrieved document together with its retrieval score."""
+
+    score: float
+
+
+class RetrievalResult(BaseModel):
+    """Contains both raw retrieval scores and resolved documents."""
+
+    results: list[tuple[int, float]]
+    documents: list[ScoredDocument]
+
+
 class ExampleMetadata(BaseModel):
     """Optional metadata used for analysis."""
 

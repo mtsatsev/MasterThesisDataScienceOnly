@@ -9,8 +9,37 @@ from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
 from llm_bayesian_reasoning.retrievers.base_retriever import BaseRetriever
+from llm_bayesian_reasoning.retrievers.document import RetrievalResult, ScoredDocument
 
 logger = logging.getLogger(__name__)
+
+
+def _materialize_scored_documents(
+    entities: list[str] | None,
+    titles: list[str] | None,
+    results: list[tuple[int, float]],
+) -> list[ScoredDocument]:
+    if entities is None:
+        raise ValueError("Index not loaded. Call build_index() or load_index() first.")
+
+    scored_documents: list[ScoredDocument] = []
+    for idx, score in results:
+        title = titles[idx] if titles is not None else entities[idx]
+        scored_documents.append(
+            ScoredDocument(title=title, text=entities[idx], score=score)
+        )
+    return scored_documents
+
+
+def _build_retrieval_result(
+    entities: list[str] | None,
+    titles: list[str] | None,
+    results: list[tuple[int, float]],
+) -> RetrievalResult:
+    return RetrievalResult(
+        results=results,
+        documents=_materialize_scored_documents(entities, titles, results),
+    )
 
 
 class BM25Retriever(BaseRetriever):
@@ -120,16 +149,16 @@ class BM25Retriever(BaseRetriever):
         self,
         query: str,
         top_k: int = 10,
-    ) -> list[tuple[int, float]]:
+    ) -> RetrievalResult:
         """
-        Retrieve top-k entities most relevant to the query.
+        Retrieve top-k entities together with both scores and resolved documents.
 
         Args:
             query (str): Query string
             top_k (int): Number of top entities to return
 
         Returns:
-            list of tuples (index, score) for top-k entities sorted by relevance
+            RetrievalResult with raw (index, score) pairs and resolved documents
         """
 
         if self.bm25 is None or self.entities is None:
@@ -147,7 +176,11 @@ class BM25Retriever(BaseRetriever):
         results = [(int(i), float(scores[i])) for i in top_indices]
         logger.debug("Retrieved %d entities for query: '%s'", len(results), query)
 
-        return results
+        return _build_retrieval_result(
+            self.entities,
+            self.titles,
+            results,
+        )
 
     def append_batch(
         self,
@@ -343,16 +376,16 @@ class E5Retriever(BaseRetriever):
         self,
         query: str,
         top_k: int = 10,
-    ) -> list[str]:
+    ) -> RetrievalResult:
         """
-        Retrieve top-k entities most semantically similar to the query.
+        Retrieve top-k entities together with both scores and resolved documents.
 
         Args:
             query (str): Query string
             top_k (int): Number of top entities to return
 
         Returns:
-            list[str]: List of top-k entities sorted by semantic similarity
+            RetrievalResult with raw (index, score) pairs and resolved documents
         """
         # Rebuild index if entities changed
         if self.entity_embeddings is None or self.entities is None:
@@ -372,7 +405,11 @@ class E5Retriever(BaseRetriever):
         results = [(int(i), float(scores[i])) for i in top_indices]
         logger.debug(f"Retrieved {len(results)} entities for query: '{query}'")
 
-        return results
+        return _build_retrieval_result(
+            self.entities,
+            self.titles,
+            results,
+        )
 
     def append_batch(
         self,

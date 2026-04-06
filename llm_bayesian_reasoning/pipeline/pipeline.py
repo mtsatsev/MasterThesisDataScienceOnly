@@ -2,12 +2,14 @@ import json
 import logging
 from pathlib import Path
 
-from problog import get_evaluatable
-from problog.program import PrologString
-
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
-from llm_bayesian_reasoning.pipeline.config import PipelineConfig
+from llm_bayesian_reasoning.pipeline.config import LogicBackendType, PipelineConfig
+from llm_bayesian_reasoning.pipeline.logic_backends import (
+    DeepProbLogBackend,
+    LogicBackend,
+    ProbLogBackend,
+)
 from llm_bayesian_reasoning.pipeline.metrics import (
     compute_metrics,
     compute_record_metrics,
@@ -19,6 +21,14 @@ from llm_bayesian_reasoning.problog_models.problog_models import (
 from llm_bayesian_reasoning.retrievers.retrievers import BM25Retriever
 
 logger = logging.getLogger(__name__)
+
+
+def create_logic_backend(backend_type: LogicBackendType) -> LogicBackend:
+    if backend_type == LogicBackendType.PROBLOG:
+        return ProbLogBackend()
+    if backend_type == LogicBackendType.DEEPPROBLOG:
+        return DeepProbLogBackend()
+    raise ValueError(f"Unsupported logic backend: {backend_type}")
 
 
 def build_or_load_index(
@@ -98,27 +108,55 @@ def build_or_load_index(
     return retriever
 
 
-def evaluate_problog(problog_str: str) -> float:
-    """Evaluate a ProbLog program and return the probability of the query.
+def _combine_context(
+    atom_context: str | None,
+    document_text: str | None,
+    separator: str = "\n\n",
+) -> str | None:
+    normalized_document_text = document_text.strip() if document_text else None
+    if not normalized_document_text:
+        return atom_context
+    if atom_context is None:
+        return normalized_document_text
+    return atom_context + separator + normalized_document_text
 
-    Args:
-        problog_str: A valid ProbLog program string containing exactly one
-            ``query(...)`` directive.
 
-    Returns:
-        The probability of the query, or ``0.0`` if evaluation fails.
-    """
-    try:
-        db = PrologString(problog_str)
-        result = get_evaluatable().create_from(db).evaluate()
-        # ``result`` is a dict mapping Term -> float; take the single value
-        if result:
-            return float(next(iter(result.values())))
-        return 0.0
-    except Exception:  # noqa: BLE001
-        # Log full traceback and the program to help debugging parsing/evaluation issues
-        logger.exception("Problog evaluation failed for program:\n%s", problog_str)
-        return 0.0
+def _clone_atoms_with_document_context(
+    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+    document_text: str | None,
+) -> list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]:
+    if not atoms:
+        return atoms
+
+    if isinstance(atoms[0], tuple):
+        contextualized_atoms: list[tuple[ProblogAtom, ProblogAtom]] = []
+        for atom, negated_atom in atoms:
+            contextualized_atoms.append(
+                (
+                    ProblogAtom(
+                        atom=atom.atom,
+                        probability=atom.probability,
+                        context=_combine_context(atom.context, document_text),
+                    ),
+                    ProblogAtom(
+                        atom=negated_atom.atom,
+                        probability=negated_atom.probability,
+                        context=_combine_context(negated_atom.context, document_text),
+                    ),
+                )
+            )
+        return contextualized_atoms
+
+    contextualized_atoms: list[ProblogAtom] = []
+    for atom in atoms:
+        contextualized_atoms.append(
+            ProblogAtom(
+                atom=atom.atom,
+                probability=atom.probability,
+                context=_combine_context(atom.context, document_text),
+            )
+        )
+    return contextualized_atoms
 
 
 def run_pipeline(
@@ -172,6 +210,7 @@ def run_pipeline(
                     "batch_size": config.batch_size,
                     "model_name": config.estimator_config.model_name,
                     "device": config.estimator_config.device,
+                    "include_retrieved_text": config.estimator_config.include_retrieved_text,
                 }
             )
             # Tag the run with the on-disk results folder for easy lookup
@@ -226,6 +265,9 @@ def run_pipeline(
             logger.exception("Failed to instantiate estimator from config")
             raise
 
+    logic_backend = create_logic_backend(config.logic_backend)
+    logger.info("Using logic backend: %s", config.logic_backend.value)
+
     with open(output_path, "a", encoding="utf-8") as out_f:
         for record_id, record in data.items():
             if record_id in processed_ids:
@@ -238,7 +280,7 @@ def run_pipeline(
                 formula: ProblogFormula = record["problog_formula"]
 
                 # --- Step 1: BM25 retrieval (top-N) ---
-                top_n_results = retriever.retrieve(query, top_k=config.top_n)
+                top_n_results = retriever.retrieve(query, top_k=config.top_n).documents
                 if not top_n_results:
                     logger.warning("No BM25 results for record %s", record_id)
                     results[record_id] = {
@@ -251,20 +293,21 @@ def run_pipeline(
                     continue
 
                 # Resolve entity titles; fall back to entity text when no titles
-                candidate_entities: list[str] = []
-                for idx, _score in top_n_results:
-                    if retriever.titles is not None:
-                        candidate_entities.append(retriever.titles[idx])
-                    else:
-                        candidate_entities.append(retriever.entities[idx])
+                candidate_entities = [doc.title for doc in top_n_results]
 
                 # --- Steps 2–3: LLM scoring + Problog evaluation ---
                 entity_scores: dict[str, float] = {}
-                for entity in candidate_entities:
+                for document in top_n_results:
+                    entity = document.title
+                    scoring_atoms = atoms
+                    if config.estimator_config.include_retrieved_text:
+                        scoring_atoms = _clone_atoms_with_document_context(
+                            atoms,
+                            document.text,
+                        )
                     try:
-                        scored_atoms = estimator.score_probability(atoms, entity)
-                        problog_str = formula.to_problog(scored_atoms, entity)
-                        prob = evaluate_problog(problog_str)
+                        scored_atoms = estimator.score_probability(scoring_atoms, entity)
+                        prob = logic_backend.evaluate(scored_atoms, formula, entity)
                     except Exception:  # noqa: BLE001
                         logger.exception(
                             "Scoring failed for record %s, entity %r — skipping entity",
@@ -328,6 +371,7 @@ def run_pipeline(
                         # Structured per-query table row
                         row: dict = {
                             "record_id": [record_id],
+                                "logic_backend": config.logic_backend.value,
                             "query": [query],
                             "model": [config.estimator_config.model_name],
                             "ground_truth": [

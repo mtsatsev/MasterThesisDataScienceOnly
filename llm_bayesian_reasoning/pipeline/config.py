@@ -19,6 +19,13 @@ class EstimatorType(str, Enum):
     LIKELIHOOD_BASED_CONTRASTIVE = "Contrastive"
 
 
+class LogicBackendType(str, Enum):
+    """Enumeration of supported logic evaluation backends."""
+
+    PROBLOG = "ProbLog"
+    DEEPPROBLOG = "DeepProbLog"
+
+
 class EstimatorConfig(BaseModel):
     """Configuration for probability estimation.
 
@@ -54,6 +61,10 @@ class EstimatorConfig(BaseModel):
         le=1.0,
         ge=0.0,
         description="Temperature for contrastive estimation",
+    )
+    include_retrieved_text: bool = Field(
+        default=False,
+        description="Include retrieved document text in Problog atom context",
     )
     quantization: BitsAndBytesConfig = Field(
         default_factory=lambda: BitsAndBytesConfig(load_in_4bit=True)
@@ -94,6 +105,10 @@ class PipelineConfig(BaseModel):
     estimator_config: EstimatorConfig = Field(
         default_factory=EstimatorConfig,
         description="LLM estimator configuration",
+    )
+    logic_backend: LogicBackendType = Field(
+        default=LogicBackendType.PROBLOG,
+        description="Logic backend used to evaluate the final program",
     )
     mlflow_experiment: str | None = Field(
         default=None,

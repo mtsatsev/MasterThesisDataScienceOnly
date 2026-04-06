@@ -160,7 +160,7 @@ class TrueFalseLLMEstimator(BaseEstimator):
         logger = logging.getLogger(__name__)
         results = []
         for predicate in predicates:
-            prompt = predicate.to_prompt(entity)
+            prompt = predicate.to_prompt_with_context(entity)
             t_prob, f_prob = self.get_probability_for_prompt(prompt)
             # if both probabilities zero, warn once with prompt sample
             if t_prob == 0.0 and f_prob == 0.0:

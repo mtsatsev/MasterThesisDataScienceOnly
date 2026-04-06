@@ -61,6 +61,15 @@ class ProblogAtom(BaseModel):
         entity_str = entity if entity is not None else "{X}"
         return f"{self.probability}::{self.problog_atom_format}({entity_str!r})."
 
+    def to_deepproblog_fact(self, entity: str | None = None) -> str:
+        """Convert the atom to a DeepProbLog-compatible fact.
+
+        The initial DeepProbLog integration uses fixed probabilistic facts,
+        which share syntax with ProbLog. Neural predicates can replace this in a
+        later step.
+        """
+        return self.to_proposition(entity)
+
     def to_prompt_with_context(self, entity: str, separator: str = "\n\n") -> str:
         """Convert the ProblogAtom to a prompt format for LLMs.
 
@@ -186,4 +195,18 @@ class ProblogFormula(BaseModel):
                     provided_predicates,
                 )
 
+        return propositions + "\n" + formula_rule + "\n" + query_directive
+
+    def to_deepproblog(self, atoms: list[ProblogAtom], entity: str) -> str:
+        """Convert the formula to a DeepProbLog-compatible program.
+
+        The initial DeepProbLog integration reuses fixed probabilistic facts and
+        standard rule syntax so the logical structure stays identical.
+        """
+        entity_str = entity if entity is not None else "{X}"
+        propositions = "\n".join(
+            atom.to_deepproblog_fact(entity) for atom in atoms
+        )
+        formula_rule = self.problog_formula_format.replace("{X}", f"{entity_str!r}")
+        query_directive = f"query({self.head}({entity_str!r}))."
         return propositions + "\n" + formula_rule + "\n" + query_directive

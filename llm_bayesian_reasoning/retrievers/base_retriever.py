@@ -1,6 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
 
+from llm_bayesian_reasoning.retrievers.document import RetrievalResult
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,16 +32,16 @@ class BaseRetriever(ABC):
         """
 
     @abstractmethod
-    def retrieve(self, query: str, top_k: int = 10) -> list[tuple[int, float]]:
+    def retrieve(self, query: str, top_k: int = 10) -> RetrievalResult:
         """
-        Retrieve top-k entities most relevant to the query.
+        Retrieve top-k entities together with both raw scores and resolved documents.
 
         Args:
             query: Query string
             top_k: Number of top entities to return
 
         Returns:
-            List of tuples (index, score) for top-k entities sorted by relevance
+            RetrievalResult containing raw (index, score) pairs and resolved documents
         """
 
     @abstractmethod
