@@ -1,6 +1,8 @@
 import json
 import logging
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 from llm_bayesian_reasoning.pipeline.config import RetrieverType
 from llm_bayesian_reasoning.retrievers.base_retriever import BaseRetriever
@@ -9,6 +11,29 @@ from llm_bayesian_reasoning.retrievers.retrievers import BM25Retriever, E5Retrie
 logger = logging.getLogger(__name__)
 
 DEFAULT_E5_MODEL_NAME = "intfloat/e5-base-v2"
+
+
+def _get_progress_wrapper() -> Any:
+    try:
+        from tqdm.auto import tqdm
+    except ImportError:
+        return None
+    return tqdm
+
+
+def _count_documents(documents_path: str | Path) -> int:
+    with open(documents_path, encoding="utf-8") as file_handle:
+        return sum(1 for _ in file_handle)
+
+
+def _progress_enabled_total(
+    documents_path: str | Path,
+    limit: int | None,
+) -> int:
+    total_documents = _count_documents(documents_path)
+    if limit is None:
+        return total_documents
+    return min(total_documents, limit)
 
 
 def create_retriever(
@@ -31,28 +56,45 @@ def _iter_document_batches(
     documents_path: str | Path,
     batch_size: int,
     limit: int | None = None,
-):
+    show_progress: bool = False,
+) -> Iterator[tuple[list[str], list[str]]]:
     entities_batch: list[str] = []
     titles_batch: list[str] = []
     total = 0
+    progress_bar = None
+    tqdm = _get_progress_wrapper() if show_progress else None
 
-    with open(documents_path, encoding="utf-8") as file_handle:
-        for line in file_handle:
-            if limit is not None and total >= limit:
-                break
+    if tqdm is not None:
+        progress_bar = tqdm(
+            total=_progress_enabled_total(documents_path, limit),
+            desc="Indexing documents",
+            unit="doc",
+        )
 
-            document = json.loads(line)
-            entities_batch.append(document["text"])
-            titles_batch.append(document["title"])
-            total += 1
+    try:
+        with open(documents_path, encoding="utf-8") as file_handle:
+            for line in file_handle:
+                if limit is not None and total >= limit:
+                    break
 
-            if len(entities_batch) >= batch_size:
-                yield entities_batch, titles_batch
-                entities_batch = []
-                titles_batch = []
+                document = json.loads(line)
+                entities_batch.append(document["text"])
+                titles_batch.append(document["title"])
+                total += 1
 
-    if entities_batch:
-        yield entities_batch, titles_batch
+                if progress_bar is not None:
+                    progress_bar.update(1)
+
+                if len(entities_batch) >= batch_size:
+                    yield entities_batch, titles_batch
+                    entities_batch = []
+                    titles_batch = []
+
+        if entities_batch:
+            yield entities_batch, titles_batch
+    finally:
+        if progress_bar is not None:
+            progress_bar.close()
 
 
 def build_or_load_retriever(
@@ -63,6 +105,7 @@ def build_or_load_retriever(
     limit: int | None = None,
     retriever_model_name: str = DEFAULT_E5_MODEL_NAME,
     retriever_device: str | None = None,
+    show_progress: bool = False,
 ) -> BaseRetriever:
     """Build or load a configured retriever index."""
     index_dir = Path(index_path)
@@ -99,6 +142,7 @@ def build_or_load_retriever(
             documents_path,
             batch_size,
             limit,
+            show_progress,
         ):
             retriever.append_batch(
                 entities=entities_batch,
@@ -119,6 +163,7 @@ def build_or_load_retriever(
         documents_path,
         batch_size,
         limit,
+        show_progress,
     ):
         if not built:
             retriever.build_index(

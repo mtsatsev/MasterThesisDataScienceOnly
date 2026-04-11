@@ -44,7 +44,7 @@ def add_common_index_arguments(parser: argparse.ArgumentParser) -> None:
         "--limit",
         type=int,
         default=None,
-        help="Optional maximum number of documents to index",
+        help="Optional maximum number of documents to index; omit it to index the full corpus",
     )
     parser.add_argument(
         "--overwrite",
@@ -157,6 +157,7 @@ def build_index(
         limit=limit,
         retriever_model_name=model_name,
         retriever_device=_normalize_device(device),
+        show_progress=True,
     )
     entity_count = len(getattr(retriever, "entities", []) or [])
     logger.info(

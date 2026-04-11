@@ -18,7 +18,7 @@ python scripts/build_bm25_index.py \
 Useful options:
 
 - `--batch-size`: number of documents processed per batch while indexing
-- `--limit`: cap indexing to the first `N` documents for smoke tests
+- `--limit`: cap indexing to the first `N` documents for smoke tests; omit it to index the full corpus
 - `--overwrite`: rebuild an existing non-empty index directory
 - `--log-level`: one of `DEBUG`, `INFO`, `WARNING`, `ERROR`
 
@@ -39,7 +39,7 @@ Useful options:
 - `--model-name`: SentenceTransformer model identifier
 - `--device`: device selection such as `auto`, `cpu`, `cuda`, or `cuda:0`
 - `--batch-size`: number of documents processed per batch while indexing
-- `--limit`: cap indexing to the first `N` documents for smoke tests
+- `--limit`: cap indexing to the first `N` documents for smoke tests; omit it to index the full corpus
 - `--overwrite`: rebuild an existing non-empty index directory
 - `--log-level`: one of `DEBUG`, `INFO`, `WARNING`, `ERROR`
 
@@ -47,5 +47,6 @@ Useful options:
 
 - Both scripts fail by default if the target index directory already exists and is not empty.
 - Pass `--overwrite` to remove the existing directory and rebuild the index.
+- Both scripts show a document-level progress bar while indexing.
 - BM25 artifacts are written in the existing repo format with `bm25.pkl`, metadata, and JSONL files.
 - E5 artifacts are written in the existing repo format with `embeddings.npy`, metadata, and JSONL files.

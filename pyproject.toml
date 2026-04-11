@@ -23,6 +23,7 @@ dependencies = [
   "nltk>=3.9.2,<4.0.0",
   "absl-py>=2.4.0,<3.0.0",
   "gensim>=4.4.0,<5.0.0",
+  "tqdm>=4.67.1,<5.0.0",
   "nbconvert>=7.17.0,<8.0.0",
   "mlflow[genai]<3.10.0",
 ]
