@@ -4,7 +4,11 @@ from pathlib import Path
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
-from llm_bayesian_reasoning.pipeline.config import LogicBackendType, PipelineConfig
+from llm_bayesian_reasoning.pipeline.config import (
+    LogicBackendType,
+    PipelineConfig,
+    RetrieverType,
+)
 from llm_bayesian_reasoning.pipeline.logic_backends import (
     DeepProbLogBackend,
     LogicBackend,
@@ -18,7 +22,9 @@ from llm_bayesian_reasoning.problog_models.problog_models import (
     ProblogAtom,
     ProblogFormula,
 )
-from llm_bayesian_reasoning.retrievers.retrievers import BM25Retriever
+from llm_bayesian_reasoning.retrievers.base_retriever import BaseRetriever
+from llm_bayesian_reasoning.retrievers.document import ScoredDocument
+from llm_bayesian_reasoning.retrievers.factory import build_or_load_retriever
 
 logger = logging.getLogger(__name__)
 
@@ -36,76 +42,15 @@ def build_or_load_index(
     index_path: str | Path,
     batch_size: int = 1000,
     limit: int | None = None,
-) -> BM25Retriever:
-    """Build a BM25 index from a JSONL document corpus, or load it if it already exists.
-
-    Documents are streamed and appended in batches so that large corpora do not
-    need to be fully loaded into memory at build time.  After all batches are
-    appended the BM25 model is rebuilt once via ``finalize_index``.
-
-    Args:
-        documents_path: Path to a JSONL file where each line is
-            ``{"title": str, "text": str}``.
-        index_path: Directory in which to persist (or load) the index.
-        batch_size: Number of documents processed per append call.
-        limit: If set, only index the first ``limit`` documents. Useful for
-            testing without building a full index.
-
-    Returns:
-        A loaded :class:`BM25Retriever` instance ready for retrieval.
-    """
-    index_dir = Path(index_path)
-    retriever = BM25Retriever()
-
-    if (index_dir / "bm25.pkl").exists():
-        logger.info("Loading existing BM25 index from %s", index_dir)
-        retriever.load_index(index_dir)
-        return retriever
-
-    logger.info(
-        "Building BM25 index from %s into %s (batch_size=%d)",
-        documents_path,
-        index_dir,
-        batch_size,
+) -> BaseRetriever:
+    """Backward-compatible wrapper that builds or loads a BM25 retriever."""
+    return build_or_load_retriever(
+        documents_path=documents_path,
+        index_path=index_path,
+        retriever_type=RetrieverType.BM25,
+        batch_size=batch_size,
+        limit=limit,
     )
-    index_dir.mkdir(parents=True, exist_ok=True)
-
-    entities_batch: list[str] = []
-    titles_batch: list[str] = []
-    total = 0
-
-    with open(documents_path, encoding="utf-8") as f:
-        for line in f:
-            if limit is not None and total + len(entities_batch) >= limit:
-                break
-            doc = json.loads(line)
-            entities_batch.append(doc["text"])
-            titles_batch.append(doc["title"])
-
-            if len(entities_batch) >= batch_size:
-                retriever.append_batch(
-                    entities=entities_batch,
-                    index_path=index_dir,
-                    titles=titles_batch,
-                )
-                total += len(entities_batch)
-                logger.debug("Appended batch; total so far: %d", total)
-                entities_batch = []
-                titles_batch = []
-
-    # Flush remaining docs
-    if entities_batch:
-        retriever.append_batch(
-            entities=entities_batch,
-            index_path=index_dir,
-            titles=titles_batch,
-        )
-        total += len(entities_batch)
-
-    logger.info("Finalizing index with %d documents", total)
-    retriever.finalize_index(index_dir)
-    retriever.load_index(index_dir)
-    return retriever
 
 
 def _combine_context(
@@ -159,9 +104,80 @@ def _clone_atoms_with_document_context(
     return contextualized_atoms
 
 
+def score_candidate_documents(
+    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+    formula: ProblogFormula,
+    candidate_documents: list[ScoredDocument],
+    estimator: BaseEstimator,
+    logic_backend: LogicBackend,
+    include_retrieved_text: bool = False,
+    record_id: int | str | None = None,
+) -> dict[str, float]:
+    """Score an ordered candidate pool for a single record."""
+    entity_scores: dict[str, float] = {}
+    for document in candidate_documents:
+        entity = document.title
+        scoring_atoms = atoms
+        if include_retrieved_text:
+            scoring_atoms = _clone_atoms_with_document_context(
+                atoms,
+                document.text,
+            )
+        try:
+            scored_atoms = estimator.score_probability(scoring_atoms, entity)
+            probability = logic_backend.evaluate(scored_atoms, formula, entity)
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Scoring failed for record %s, entity %r — skipping entity",
+                record_id,
+                entity,
+            )
+            continue
+        entity_scores[entity] = probability
+        logger.debug("  entity=%r  prob=%.4f", entity, probability)
+    return entity_scores
+
+
+def build_record_result(
+    query: str,
+    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+    candidate_entities: list[str],
+    entity_scores: dict[str, float],
+    top_k: int,
+    relevant: set[str] | None = None,
+) -> tuple[dict, list[tuple[str, float]]]:
+    """Create a persisted record result from scored candidate entities."""
+    candidate_entity_set = set(candidate_entities)
+    ranked = sorted(
+        (
+            (entity, score)
+            for entity, score in entity_scores.items()
+            if entity in candidate_entity_set
+        ),
+        key=lambda item: item[1],
+        reverse=True,
+    )
+    ranked_entities = [entity for entity, _ in ranked[:top_k]]
+
+    record_result = {
+        "query": query,
+        "ranked_entities": ranked_entities,
+        "scores": {entity: score for entity, score in ranked[:top_k]},
+        "num_atoms": len(atoms),
+    }
+    if relevant is not None:
+        record_result["ground_truth"] = list(relevant)
+        record_result["record_metrics"] = compute_record_metrics(
+            ranked_entities,
+            relevant,
+            top_k,
+        )
+    return record_result, ranked
+
+
 def run_pipeline(
     data: dict,
-    retriever: BM25Retriever,
+    retriever: BaseRetriever,
     estimator: BaseEstimator | None,
     config: PipelineConfig,
     ground_truth: dict[int | str, list[str]] | None = None,
@@ -298,50 +314,30 @@ def run_pipeline(
                 candidate_entities = [doc.title for doc in top_n_results]
 
                 # --- Steps 2–3: LLM scoring + Problog evaluation ---
-                entity_scores: dict[str, float] = {}
-                for document in top_n_results:
-                    entity = document.title
-                    scoring_atoms = atoms
-                    if config.estimator_config.include_retrieved_text:
-                        scoring_atoms = _clone_atoms_with_document_context(
-                            atoms,
-                            document.text,
-                        )
-                    try:
-                        scored_atoms = estimator.score_probability(
-                            scoring_atoms, entity
-                        )
-                        prob = logic_backend.evaluate(scored_atoms, formula, entity)
-                    except Exception:  # noqa: BLE001
-                        logger.exception(
-                            "Scoring failed for record %s, entity %r — skipping entity",
-                            record_id,
-                            entity,
-                        )
-                        continue
-                    entity_scores[entity] = prob
-                    logger.debug("  entity=%r  prob=%.4f", entity, prob)
+                entity_scores = score_candidate_documents(
+                    atoms=atoms,
+                    formula=formula,
+                    candidate_documents=top_n_results,
+                    estimator=estimator,
+                    logic_backend=logic_backend,
+                    include_retrieved_text=config.estimator_config.include_retrieved_text,
+                    record_id=record_id,
+                )
 
                 # --- Step 4: Rerank to top-K ---
-                ranked = sorted(
-                    entity_scores.items(), key=lambda kv: kv[1], reverse=True
-                )
-                ranked_entities = [e for e, _ in ranked[: config.top_k]]
-
-                record_result = {
-                    "query": query,
-                    "ranked_entities": ranked_entities,
-                    "scores": {e: s for e, s in ranked[: config.top_k]},
-                    "num_atoms": len(atoms),
-                }
-
-                # Per-record metrics (when ground truth is available)
+                relevant = None
                 if ground_truth is not None and record_id in ground_truth:
                     relevant = set(ground_truth[record_id])
-                    record_result["ground_truth"] = list(relevant)
-                    record_result["record_metrics"] = compute_record_metrics(
-                        ranked_entities, relevant, config.top_k
-                    )
+
+                record_result, ranked = build_record_result(
+                    query=query,
+                    atoms=atoms,
+                    candidate_entities=candidate_entities,
+                    entity_scores=entity_scores,
+                    top_k=config.top_k,
+                    relevant=relevant,
+                )
+                ranked_entities = record_result["ranked_entities"]
 
                 results[record_id] = record_result
 

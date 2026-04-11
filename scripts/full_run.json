@@ -1,0 +1,163 @@
+{
+  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test.jsonl",
+  "results_root": "llm_bayesian_reasoning/results",
+  "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
+  "use_metadata_ground_truth": true,
+  "retrievers": [
+    {
+      "name": "bm25-main",
+      "retriever_type": "BM25",
+      "index_path": "llm_bayesian_reasoning/data/index_data/bm25_index_test_200",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "batch_size": 1000,
+      "index_limit": 200,
+      "retrieval_pool_size": 30
+    },
+    {
+      "name": "e5-main",
+      "retriever_type": "E5",
+      "index_path": "llm_bayesian_reasoning/data/index_data/e5_index_test_200",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "batch_size": 1000,
+      "index_limit": 200,
+      "retriever_model_name": "intfloat/e5-base-v2",
+      "retrieval_pool_size": 30
+    }
+  ],
+  "variants": [
+    {
+      "name": "bm25_tf_noctx",
+      "retriever_name": "bm25-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": false
+      }
+    },
+    {
+      "name": "bm25_tf_ctx",
+      "retriever_name": "bm25-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": true
+      }
+    },
+    {
+      "name": "bm25_ppl_noctx",
+      "retriever_name": "bm25-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Perplexity",
+        "include_retrieved_text": false
+      }
+    },
+    {
+      "name": "bm25_contrastive_noctx",
+      "retriever_name": "bm25-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Contrastive",
+        "include_retrieved_text": false,
+        "contrastive_temperature": 1.0
+      }
+    },
+    {
+      "name": "bm25_contrastive_ctx",
+      "retriever_name": "bm25-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Contrastive",
+        "include_retrieved_text": true,
+        "contrastive_temperature": 1.0
+      }
+    },
+    {
+      "name": "e5_tf_noctx",
+      "retriever_name": "e5-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": false
+      }
+    },
+    {
+      "name": "e5_tf_ctx",
+      "retriever_name": "e5-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": true
+      }
+    },
+    {
+      "name": "e5_ppl_noctx",
+      "retriever_name": "e5-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Perplexity",
+        "include_retrieved_text": false
+      }
+    },
+    {
+      "name": "e5_contrastive_noctx",
+      "retriever_name": "e5-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Contrastive",
+        "include_retrieved_text": false,
+        "contrastive_temperature": 1.0
+      }
+    },
+    {
+      "name": "e5_contrastive_ctx",
+      "retriever_name": "e5-main",
+      "top_n": 20,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "Contrastive",
+        "include_retrieved_text": true,
+        "contrastive_temperature": 1.0
+      }
+    }
+  ]
+}

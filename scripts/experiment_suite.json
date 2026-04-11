@@ -1,0 +1,35 @@
+{
+  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test.jsonl",
+  "results_root": "llm_bayesian_reasoning/results",
+  "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
+  "use_metadata_ground_truth": true,
+  "retrievers": [
+    {
+      "name": "bm25-main",
+      "retriever_type": "BM25",
+      "index_path": "llm_bayesian_reasoning/data/index_data/bm25_index_test_10",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "batch_size": 10,
+      "index_limit": 20,
+      "retrieval_pool_size": 10
+    }
+  ],
+  "variants": [
+    {
+      "name": "bm25_tf_ctx",
+      "retriever_name": "bm25-main",
+      "top_n": 5,
+      "top_k": 2,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": true,
+        "quantization": {
+          "load_in_4bit": true
+        }
+      }
+    }
+  ]
+}
