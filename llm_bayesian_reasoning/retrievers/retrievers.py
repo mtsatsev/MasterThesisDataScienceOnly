@@ -271,21 +271,25 @@ class BM25Retriever(BaseRetriever):
 class E5Retriever(BaseRetriever):
     """E5-base-v2 dense retriever for ranking entities by semantic similarity to a query."""
 
-    def __init__(self, model_name: str = "intfloat/e5-base-v2"):
+    def __init__(
+        self,
+        model_name: str = "intfloat/e5-base-v2",
+        device: str | None = None,
+    ):
         """
         Initialize E5 retriever.
 
         Args:
             model_name: HuggingFace model identifier for E5
         """
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name, device=device)
         self.entity_embeddings = None
         self.entities = None
         self.titles = None
         self.title_to_indices = None
         self.index_path = None
 
-        logger.debug("Loaded E5 model: %s", model_name)
+        logger.debug("Loaded E5 model: %s (device=%s)", model_name, device or "auto")
 
     def build_index(
         self,

@@ -14,12 +14,16 @@ DEFAULT_E5_MODEL_NAME = "intfloat/e5-base-v2"
 def create_retriever(
     retriever_type: RetrieverType,
     retriever_model_name: str = DEFAULT_E5_MODEL_NAME,
+    retriever_device: str | None = None,
 ) -> BaseRetriever:
     """Instantiate a retriever from configuration."""
     if retriever_type == RetrieverType.BM25:
         return BM25Retriever()
     if retriever_type == RetrieverType.E5:
-        return E5Retriever(model_name=retriever_model_name)
+        return E5Retriever(
+            model_name=retriever_model_name,
+            device=retriever_device,
+        )
     raise ValueError(f"Unsupported retriever type: {retriever_type}")
 
 
@@ -58,10 +62,15 @@ def build_or_load_retriever(
     batch_size: int = 1000,
     limit: int | None = None,
     retriever_model_name: str = DEFAULT_E5_MODEL_NAME,
+    retriever_device: str | None = None,
 ) -> BaseRetriever:
     """Build or load a configured retriever index."""
     index_dir = Path(index_path)
-    retriever = create_retriever(retriever_type, retriever_model_name)
+    retriever = create_retriever(
+        retriever_type,
+        retriever_model_name,
+        retriever_device,
+    )
 
     index_artifact = {
         RetrieverType.BM25: index_dir / "bm25.pkl",
