@@ -3,6 +3,7 @@
   "results_root": "results",
   "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
   "use_metadata_ground_truth": true,
+  "mlflow_experiment": "bm25-suite",
   "retrievers": [
     {
       "name": "bm25-main",

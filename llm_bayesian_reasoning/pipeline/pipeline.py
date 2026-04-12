@@ -141,13 +141,17 @@ def score_candidate_documents(
 def build_record_result(
     query: str,
     atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
-    candidate_entities: list[str],
+    retrieved_documents: list[ScoredDocument],
     entity_scores: dict[str, float],
     top_k: int,
     relevant: set[str] | None = None,
 ) -> tuple[dict, list[tuple[str, float]]]:
     """Create a persisted record result from scored candidate entities."""
-    candidate_entity_set = set(candidate_entities)
+    retrieved_entities = [document.title for document in retrieved_documents]
+    retrieval_scores = {
+        document.title: document.score for document in retrieved_documents
+    }
+    candidate_entity_set = set(retrieved_entities)
     ranked = sorted(
         (
             (entity, score)
@@ -161,6 +165,8 @@ def build_record_result(
 
     record_result = {
         "query": query,
+        "retrieved_entities": retrieved_entities,
+        "retrieval_scores": retrieval_scores,
         "ranked_entities": ranked_entities,
         "scores": {entity: score for entity, score in ranked},
         "num_atoms": len(atoms),
@@ -178,11 +184,21 @@ def build_record_result(
         record_result["first_relevant_rank"] = (
             min(relevant_ranks.values()) if relevant_ranks else None
         )
-        record_result["record_metrics"] = compute_record_metrics(
-            ranked_entities,
+        record_metrics = compute_record_metrics(
+            retrieved_entities,
             relevant,
             top_k,
+            prefix="retrieval",
         )
+        record_metrics.update(
+            compute_record_metrics(
+                ranked_entities,
+                relevant,
+                top_k,
+                prefix="reranked",
+            )
+        )
+        record_result["record_metrics"] = record_metrics
     return record_result, ranked
 
 
@@ -314,15 +330,16 @@ def run_pipeline(
                     logger.warning("No BM25 results for record %s", record_id)
                     results[record_id] = {
                         "query": query,
+                        "retrieved_entities": [],
+                        "retrieval_scores": {},
                         "ranked_entities": [],
                         "scores": {},
                         "num_atoms": len(atoms),
+                        "reranked_pool_size": 0,
+                        "metric_top_k": config.top_k,
                     }
                     _write_result(out_f, record_id, results[record_id])
                     continue
-
-                # Resolve entity titles; fall back to entity text when no titles
-                candidate_entities = [doc.title for doc in top_n_results]
 
                 # --- Steps 2–3: LLM scoring + Problog evaluation ---
                 entity_scores = score_candidate_documents(
@@ -343,12 +360,13 @@ def run_pipeline(
                 record_result, ranked = build_record_result(
                     query=query,
                     atoms=atoms,
-                    candidate_entities=candidate_entities,
+                    retrieved_documents=top_n_results,
                     entity_scores=entity_scores,
                     top_k=config.top_k,
                     relevant=relevant,
                 )
                 ranked_entities = record_result["ranked_entities"]
+                retrieved_entities = record_result["retrieved_entities"]
 
                 results[record_id] = record_result
 
@@ -389,7 +407,7 @@ def run_pipeline(
                             "ground_truth": [
                                 ", ".join(record_result.get("ground_truth", []))
                             ],
-                            "top_n_candidates": [", ".join(candidate_entities)],
+                            "top_n_candidates": [", ".join(retrieved_entities)],
                             "top_k_results": [", ".join(top_k_entities)],
                         }
                         for metric_name, metric_val in record_result.get(

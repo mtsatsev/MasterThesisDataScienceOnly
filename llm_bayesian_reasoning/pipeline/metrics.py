@@ -54,6 +54,7 @@ def compute_record_metrics(
     ranked: list[str],
     relevant: set[str],
     top_k: int,
+    prefix: str = "",
 ) -> dict[str, float]:
     """Compute retrieval metrics for a single record.
 
@@ -65,16 +66,17 @@ def compute_record_metrics(
     Returns:
         Dict of metric_name -> float for this record.
     """
+    metric_prefix = f"{prefix}_" if prefix else ""
     return {
-        "P@1": precision_at_k(ranked, relevant, 1),
-        f"P@{top_k}": precision_at_k(ranked, relevant, top_k),
-        "R@1": recall_at_k(ranked, relevant, 1),
-        f"R@{top_k}": recall_at_k(ranked, relevant, top_k),
-        "F1@1": f1_at_k(ranked, relevant, 1),
-        f"F1@{top_k}": f1_at_k(ranked, relevant, top_k),
-        "NDCG@1": ndcg_at_k(ranked, relevant, 1),
-        f"NDCG@{top_k}": ndcg_at_k(ranked, relevant, top_k),
-        "MRR": reciprocal_rank(ranked, relevant),
+        f"{metric_prefix}P@1": precision_at_k(ranked, relevant, 1),
+        f"{metric_prefix}P@{top_k}": precision_at_k(ranked, relevant, top_k),
+        f"{metric_prefix}R@1": recall_at_k(ranked, relevant, 1),
+        f"{metric_prefix}R@{top_k}": recall_at_k(ranked, relevant, top_k),
+        f"{metric_prefix}F1@1": f1_at_k(ranked, relevant, 1),
+        f"{metric_prefix}F1@{top_k}": f1_at_k(ranked, relevant, top_k),
+        f"{metric_prefix}NDCG@1": ndcg_at_k(ranked, relevant, 1),
+        f"{metric_prefix}NDCG@{top_k}": ndcg_at_k(ranked, relevant, top_k),
+        f"{metric_prefix}MRR": reciprocal_rank(ranked, relevant),
     }
 
 
@@ -105,9 +107,27 @@ def compute_metrics(
             continue
 
         relevant = set(ground_truth[record_id])
+        retrieved = record_result.get("retrieved_entities", [])
         ranked = record_result["ranked_entities"]
 
-        record_m = compute_record_metrics(ranked, relevant, top_k)
+        record_m: dict[str, float] = {}
+        if retrieved:
+            record_m.update(
+                compute_record_metrics(
+                    retrieved,
+                    relevant,
+                    top_k,
+                    prefix="retrieval",
+                )
+            )
+        record_m.update(
+            compute_record_metrics(
+                ranked,
+                relevant,
+                top_k,
+                prefix="reranked",
+            )
+        )
         for k, v in record_m.items():
             metric_sums[k] = metric_sums.get(k, 0.0) + v
 

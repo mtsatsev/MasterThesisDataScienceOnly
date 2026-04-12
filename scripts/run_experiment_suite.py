@@ -12,6 +12,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from llm_bayesian_reasoning.estimators.factory import (
     create_estimator_from_components,
@@ -227,6 +228,59 @@ def _prepare_variant_outputs(
     return variant_states, manifest
 
 
+def _suite_mlflow_params(suite_config: ExperimentSuiteConfig) -> dict[str, Any]:
+    return {
+        "limit": suite_config.limit,
+        "use_metadata_ground_truth": suite_config.use_metadata_ground_truth,
+        "num_retrievers": len(suite_config.retrievers),
+        "num_variants": len(suite_config.variants),
+    }
+
+
+def _variant_mlflow_params(
+    variant: ExperimentVariantConfig,
+    retriever_config: RetrieverConfig,
+) -> dict[str, Any]:
+    estimator_config = variant.estimator_config
+    return {
+        "retriever_name": retriever_config.name,
+        "retriever_type": retriever_config.retriever_type.value,
+        "index_path": str(retriever_config.index_path),
+        "retriever_model_name": retriever_config.retriever_model_name,
+        "retrieval_pool_size": retriever_config.retrieval_pool_size,
+        "top_n": variant.top_n,
+        "top_k": variant.top_k,
+        "logic_backend": variant.logic_backend.value,
+        "estimator_type": estimator_config.estimator_type.value,
+        "include_retrieved_text": estimator_config.include_retrieved_text,
+        "model_name": estimator_config.model_name,
+        "device": estimator_config.device,
+        "true_token": estimator_config.true_token,
+        "false_token": estimator_config.false_token,
+        "contrastive_temperature": estimator_config.contrastive_temperature,
+    }
+
+
+def _log_variant_to_mlflow(
+    mlflow: Any,
+    variant_name: str,
+    state: dict,
+    variant: ExperimentVariantConfig,
+    retriever_config: RetrieverConfig,
+    metrics: dict[str, float],
+) -> None:
+    with mlflow.start_run(run_name=variant_name, nested=True):
+        mlflow.log_params(_variant_mlflow_params(variant, retriever_config))
+        mlflow.set_tag("variant_name", variant_name)
+        mlflow.set_tag("retriever_name", retriever_config.name)
+        mlflow.set_tag("results_path", str(state["results_path"]))
+        if metrics:
+            mlflow.log_metrics(metrics)
+        mlflow.log_artifact(str(state["results_path"]))
+        if state["metrics_path"].exists():
+            mlflow.log_artifact(str(state["metrics_path"]))
+
+
 def _get_candidate_pool_size(
     retriever_config: RetrieverConfig,
     variants: list[ExperimentVariantConfig],
@@ -262,10 +316,38 @@ def main() -> None:
 
     suite_config.results_root.mkdir(parents=True, exist_ok=True)
     suite_results_dir = _make_suite_results_folder(suite_config.results_root)
-    (suite_results_dir / "suite_config.json").write_text(
+    suite_config_path = suite_results_dir / "suite_config.json"
+    suite_config_path.write_text(
         json.dumps(config_payload, indent=2),
         encoding="utf-8",
     )
+
+    mlflow = None
+    _mlflow_active = False
+    if suite_config.mlflow_experiment is not None:
+        try:
+            import mlflow as _mlflow
+
+            mlflow = _mlflow
+            mlflow.set_experiment(suite_config.mlflow_experiment)
+            mlflow.start_run(run_name=suite_results_dir.name)
+            mlflow.log_params(_suite_mlflow_params(suite_config))
+            mlflow.set_tag("results_path", str(suite_results_dir))
+            mlflow.set_tag("suite_config_path", str(suite_config_path))
+            _mlflow_active = True
+            logger.info(
+                "MLflow tracking enabled for suite (experiment=%r)",
+                suite_config.mlflow_experiment,
+            )
+        except ImportError:
+            logger.warning(
+                "mlflow is not installed; skipping suite tracking. pip install mlflow"
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "MLflow initialisation failed for suite — continuing without tracking.",
+                exc_info=True,
+            )
 
     logger.info("Loading preprocessed data from %s", suite_config.data_file)
     data, ground_truth = _load_preprocessed_for_suite(
@@ -284,6 +366,11 @@ def main() -> None:
     variants_by_retriever: dict[str, list[ExperimentVariantConfig]] = defaultdict(list)
     for variant in suite_config.variants:
         variants_by_retriever[variant.retriever_name].append(variant)
+
+    retrievers_by_name = {
+        retriever_config.name: retriever_config
+        for retriever_config in suite_config.retrievers
+    }
 
     try:
         for retriever_config in suite_config.retrievers:
@@ -428,16 +515,45 @@ def main() -> None:
                     encoding="utf-8",
                 )
             manifest[variant_name]["metrics"] = metrics
+            if _mlflow_active and mlflow is not None:
+                try:
+                    retriever_config = retrievers_by_name[variant.retriever_name]
+                    _log_variant_to_mlflow(
+                        mlflow=mlflow,
+                        variant_name=variant_name,
+                        state=state,
+                        variant=variant,
+                        retriever_config=retriever_config,
+                        metrics=metrics,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.warning(
+                        "MLflow variant logging failed for %s — skipping.",
+                        variant_name,
+                        exc_info=True,
+                    )
 
     finally:
         for state in variant_states.values():
             if not state["handle"].closed:
                 state["handle"].close()
 
-    (suite_results_dir / "manifest.json").write_text(
+    manifest_path = suite_results_dir / "manifest.json"
+    manifest_path.write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    if _mlflow_active and mlflow is not None:
+        try:
+            mlflow.log_artifact(str(suite_config_path))
+            mlflow.log_artifact(str(manifest_path))
+            mlflow.end_run()
+            logger.info("MLflow suite run ended. View with: mlflow ui")
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "MLflow suite cleanup failed — skipping.",
+                exc_info=True,
+            )
     logger.info("Experiment suite finished. Results folder: %s", suite_results_dir)
 
 

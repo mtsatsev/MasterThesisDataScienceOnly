@@ -238,6 +238,13 @@ class ExperimentSuiteConfig(BaseModel):
         default=False,
         description="Extract ground truth from metadata.relevance_ratings when present",
     )
+    mlflow_experiment: str | None = Field(
+        default=None,
+        description=(
+            "MLflow experiment name. When set, the suite logs a parent run and "
+            "nested per-variant runs with metrics and artifacts."
+        ),
+    )
     retrievers: list[RetrieverConfig] = Field(
         min_length=1,
         description="Retrievers available to the suite",
