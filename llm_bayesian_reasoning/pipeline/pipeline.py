@@ -157,16 +157,27 @@ def build_record_result(
         key=lambda item: item[1],
         reverse=True,
     )
-    ranked_entities = [entity for entity, _ in ranked[:top_k]]
+    ranked_entities = [entity for entity, _ in ranked]
 
     record_result = {
         "query": query,
         "ranked_entities": ranked_entities,
-        "scores": {entity: score for entity, score in ranked[:top_k]},
+        "scores": {entity: score for entity, score in ranked},
         "num_atoms": len(atoms),
+        "reranked_pool_size": len(ranked_entities),
+        "metric_top_k": top_k,
     }
     if relevant is not None:
         record_result["ground_truth"] = list(relevant)
+        relevant_ranks = {
+            entity: index + 1
+            for index, (entity, _score) in enumerate(ranked)
+            if entity in relevant
+        }
+        record_result["relevant_ranks"] = relevant_ranks
+        record_result["first_relevant_rank"] = (
+            min(relevant_ranks.values()) if relevant_ranks else None
+        )
         record_result["record_metrics"] = compute_record_metrics(
             ranked_entities,
             relevant,
@@ -192,8 +203,8 @@ def run_pipeline(
        obtain per-atom probabilities.
     3. Assemble a ProbLog program from the scored atoms and the logical formula,
        then evaluate it to obtain an entity-level probability.
-    4. Sort entities by that probability (descending) and keep top-``top_k``.
-    5. Append the result to ``output_path`` immediately (checkpointing).
+    4. Sort entities by that probability (descending) across the full top-``top_n`` pool.
+    5. Append the full reranked pool to ``output_path`` immediately (checkpointing).
 
     Args:
         data: Mapping of record id → ``{"query": str, "atoms": atoms_input,
@@ -368,6 +379,7 @@ def run_pipeline(
                             },
                             step=record_step,
                         )
+                        top_k_entities = ranked_entities[: config.top_k]
                         # Structured per-query table row
                         row: dict = {
                             "record_id": [record_id],
@@ -378,7 +390,7 @@ def run_pipeline(
                                 ", ".join(record_result.get("ground_truth", []))
                             ],
                             "top_n_candidates": [", ".join(candidate_entities)],
-                            "top_k_results": [", ".join(ranked_entities)],
+                            "top_k_results": [", ".join(top_k_entities)],
                         }
                         for metric_name, metric_val in record_result.get(
                             "record_metrics", {}
