@@ -68,6 +68,17 @@ class TrueFalseLLMEstimator(BaseEstimator):
             false_token=false_token,
         )
 
+    def _build_true_false_prompt(self, predicate: ProblogAtom, entity: str) -> str:
+        statement = predicate.to_prompt(entity).strip()
+        if statement.endswith((".", "?", "!")):
+            statement = statement[:-1]
+        statement = statement + ". Is this phrase true or false?"
+
+        if predicate.context:
+            return predicate.context.strip() + "\n" + statement
+
+        return statement
+
     def get_probability_for_prompt(self, prompt: str) -> tuple[float, float]:
         """
         Get the probabilities of True and False tokens for a given prompt.
@@ -160,7 +171,7 @@ class TrueFalseLLMEstimator(BaseEstimator):
         logger = logging.getLogger(__name__)
         results = []
         for predicate in predicates:
-            prompt = predicate.to_prompt_with_context(entity)
+            prompt = self._build_true_false_prompt(predicate, entity)
             t_prob, f_prob = self.get_probability_for_prompt(prompt)
             # if both probabilities zero, warn once with prompt sample
             if t_prob == 0.0 and f_prob == 0.0:
