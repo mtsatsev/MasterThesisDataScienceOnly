@@ -4,6 +4,7 @@
 import argparse
 import json
 import logging
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,10 @@ from llm_bayesian_reasoning.problog_models.problog_models import (
 )
 
 logger = logging.getLogger("smoke_test_problog_pairs")
+FORMULA_ATOM_PATTERN = re.compile(
+    r"\{X\}[^()]*?(?=(\bAND\b|\bOR\b|\bNOT\b|\)|$))",
+    flags=re.IGNORECASE,
+)
 
 
 def _normalize_placeholder(value: str) -> str:
@@ -41,6 +46,92 @@ def _evaluate_program(program: str) -> float:
 def _default_output_path(results_root: Path) -> Path:
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     return results_root / f"problog_smoke_failures_{timestamp}.jsonl"
+
+
+def _count_parenthesis_imbalance(expression: str) -> dict[str, int]:
+    unmatched_closing = 0
+    open_count = 0
+    for char in expression:
+        if char == "(":
+            open_count += 1
+        elif char == ")":
+            if open_count == 0:
+                unmatched_closing += 1
+            else:
+                open_count -= 1
+    return {
+        "unmatched_opening": open_count,
+        "unmatched_closing": unmatched_closing,
+    }
+
+
+def _extract_formula_phrases(formula_text: str) -> list[str]:
+    phrases: list[str] = []
+    for match in FORMULA_ATOM_PATTERN.finditer(formula_text):
+        phrase = match.group(0).strip()
+        if phrase and phrase not in phrases:
+            phrases.append(phrase)
+    return phrases
+
+
+def _build_failure_reason(
+    error: Exception,
+    *,
+    phase: str,
+    atoms: list[ProblogAtom] | None,
+    formula: ProblogFormula | None,
+    program: str | None,
+) -> tuple[str, dict[str, Any]]:
+    diagnostics: dict[str, Any] = {}
+    message = str(error)
+
+    if formula is not None:
+        diagnostics["formula_parentheses"] = _count_parenthesis_imbalance(
+            formula.formula
+        )
+        diagnostics["formula_atom_phrases"] = _extract_formula_phrases(formula.formula)
+
+    if atoms is not None and formula is not None:
+        atom_texts = {atom.atom for atom in atoms}
+        missing_formula_atoms = [
+            phrase
+            for phrase in diagnostics.get("formula_atom_phrases", [])
+            if phrase not in atom_texts
+        ]
+        if missing_formula_atoms:
+            diagnostics["missing_formula_atoms"] = missing_formula_atoms
+
+    if phase == "parse_json":
+        return "invalid_json", diagnostics
+
+    if phase == "load_record":
+        return "invalid_record_structure", diagnostics
+
+    if "not present in the supplied atom list" in message:
+        return "formula_atom_mismatch", diagnostics
+
+    if "unresolved placeholder text" in message:
+        return "unresolved_formula_text", diagnostics
+
+    if program is not None and "Expected binary operator" in message:
+        diagnostics["program_contains_raw_text"] = " is " in program
+        return "invalid_raw_formula_text", diagnostics
+
+    if program is not None and "Unmatched character" in message:
+        diagnostics["program_parentheses"] = _count_parenthesis_imbalance(program)
+        return "unbalanced_formula_parentheses", diagnostics
+
+    if diagnostics.get("missing_formula_atoms"):
+        return "formula_atom_mismatch", diagnostics
+
+    if formula is not None:
+        formula_parentheses = diagnostics.get("formula_parentheses", {})
+        if formula_parentheses.get("unmatched_opening") or formula_parentheses.get(
+            "unmatched_closing"
+        ):
+            return "unbalanced_formula_parentheses", diagnostics
+
+    return "problog_evaluation_error", diagnostics
 
 
 def _load_record(
@@ -84,16 +175,26 @@ def _write_failure(
     formula: ProblogFormula | None = None,
     program: str | None = None,
 ) -> None:
+    reason, diagnostics = _build_failure_reason(
+        error,
+        phase=phase,
+        atoms=atoms,
+        formula=formula,
+        program=program,
+    )
     row = {
         "id": record_id,
         "query": query,
+        "status": "failed",
         "phase": phase,
+        "reason": reason,
         "error_type": type(error).__name__,
         "error": str(error),
         "num_atoms": len(atoms) if atoms is not None else None,
         "atoms": [atom.model_dump() for atom in atoms] if atoms is not None else None,
         "formula": formula.formula if formula is not None else None,
         "program": program,
+        "diagnostics": diagnostics,
     }
     handle.write(json.dumps(row, ensure_ascii=False) + "\n")
     handle.flush()
