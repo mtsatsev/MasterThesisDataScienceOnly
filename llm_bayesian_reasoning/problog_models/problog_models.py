@@ -110,8 +110,8 @@ class ProblogFormula(BaseModel):
     )
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
-    @property
     @computed_field
+    @property
     def problog_formula_format(self) -> str:
         """
         Convert a logical string with {X}, AND, OR, NOT into a simple ProbLog-style rule.
