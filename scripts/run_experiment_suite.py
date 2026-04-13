@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Sequence
 
 from llm_bayesian_reasoning.estimators.factory import (
     create_estimator_from_components,
@@ -130,8 +130,10 @@ def _build_variant_atoms(
             raise ValueError(
                 "Contrastive variants require the same number of atoms and negated_atoms"
             )
-        return list(zip(positive_atoms, negated_atoms))
-
+        pairs: list[tuple[ProblogAtom, ProblogAtom]] = list(
+            zip(positive_atoms, negated_atoms)
+        )
+        return pairs
     return positive_atoms
 
 
@@ -477,17 +479,13 @@ def main() -> None:
                             variant_candidate_documents = candidate_pool.documents[
                                 : variant.top_n
                             ]
-                            candidate_entities = [
-                                document.title
-                                for document in variant_candidate_documents
-                            ]
                             relevant = None
                             if record_id in ground_truth_map:
                                 relevant = set(ground_truth_map[record_id])
                             record_result, _ = build_record_result(
                                 query=query,
                                 atoms=atoms,
-                                candidate_entities=candidate_entities,
+                                retrieved_documents=variant_candidate_documents,
                                 entity_scores=entity_scores,
                                 top_k=variant.top_k,
                                 relevant=relevant,

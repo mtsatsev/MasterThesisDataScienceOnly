@@ -477,3 +477,8 @@ class E5Retriever(BaseRetriever):
         logger.debug(
             f"Appended {len(entities)} entities to E5 index at {index_path}. Embeddings and metadata updated."
         )
+
+    def finalize_index(self, index_path: Path) -> None:
+        raise NotImplementedError(
+            "E5 retriever does not require finalize_index() as it updates embeddings incrementally."
+        )

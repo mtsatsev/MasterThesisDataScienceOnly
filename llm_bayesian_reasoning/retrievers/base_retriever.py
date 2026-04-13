@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from llm_bayesian_reasoning.retrievers.document import RetrievalResult
 
@@ -11,7 +12,7 @@ class BaseRetriever(ABC):
 
     @abstractmethod
     def build_index(
-        self, entities: list[str], index_path: str, titles: list[str] | None = None
+        self, entities: list[str], index_path: Path, titles: list[str] | None = None
     ) -> None:
         """
         Build index from entities.
@@ -23,12 +24,12 @@ class BaseRetriever(ABC):
         """
 
     @abstractmethod
-    def load_index(self, index_path: str) -> None:
+    def load_index(self, index_path: Path) -> None:
         """
         Load a previously built index.
 
         Args:
-            index_path: Path to the saved index
+            index_path (Path): Path to the saved index
         """
 
     @abstractmethod
@@ -37,21 +38,31 @@ class BaseRetriever(ABC):
         Retrieve top-k entities together with both raw scores and resolved documents.
 
         Args:
-            query: Query string
-            top_k: Number of top entities to return
+            query (str): Query string
+            top_k (int): Number of top entities to return
 
         Returns:
-            RetrievalResult containing raw (index, score) pairs and resolved documents
+            RetrievalResult: Containing raw (index, score) pairs and resolved documents
         """
 
     @abstractmethod
     def append_batch(
-        self, entities: list[str], index_path: str, titles: list[str] | None = None
+        self, entities: list[str], index_path: Path, titles: list[str] | None = None
     ) -> None:
         """
         Append a batch of entities to the existing index.
 
         Args:
-            entities: List of entity strings to append
-            titles: Optional list of titles/ids parallel to `entities`
+            entities (list[str]): List of entity strings to append
+            index_path (Path): Path to the existing index
+            titles (list[str] | None): Optional list of titles/ids parallel to `entities`
+        """
+
+    @abstractmethod
+    def finalize_index(self, index_path: Path) -> None:
+        """
+        Finalize the index after all batches have been appended.
+
+        Args:
+            index_path (Path): Path to the existing index
         """

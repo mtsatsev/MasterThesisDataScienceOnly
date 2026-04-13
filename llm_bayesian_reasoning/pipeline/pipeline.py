@@ -1,6 +1,9 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any, cast, overload
+
+import mlflow
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
@@ -66,42 +69,75 @@ def _combine_context(
     return atom_context + separator + normalized_document_text
 
 
+@overload
+def _clone_atoms_with_document_context(
+    atoms: list[ProblogAtom],
+    document_text: str | None,
+) -> list[ProblogAtom]: ...
+
+
+@overload
+def _clone_atoms_with_document_context(
+    atoms: list[tuple[ProblogAtom, ProblogAtom]],
+    document_text: str | None,
+) -> list[tuple[ProblogAtom, ProblogAtom]]: ...
+
+
+def _clone_atom_with_context(
+    atom: ProblogAtom,
+    document_text: str | None,
+) -> ProblogAtom:
+    """
+    Clone a single ProblogAtom, appending retrieved document text to its context (if any).
+
+    Args:
+        atom (ProblogAtom): The atom to clone.
+        document_text (str | None): The retrieved document text to append to the atom's context.
+
+    Returns:
+        ProblogAtom: A new ProblogAtom with the updated context.
+    """
+    return ProblogAtom(
+        atom=atom.atom,
+        probability=atom.probability,
+        context=_combine_context(atom.context, document_text),
+    )
+
+
 def _clone_atoms_with_document_context(
     atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
     document_text: str | None,
 ) -> list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]:
+    """
+    Clone a list of ProblogAtoms (or tuples of atoms), appending retrieved document text
+        to their contexts.
+
+    Args:
+        atoms (list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]): The atoms to
+            clone.
+        document_text (str | None): The retrieved document text to append to each
+            atom's context.
+
+    Returns:
+        list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]: A new list of atoms
+            with updated contexts.
+    """
     if not atoms:
         return atoms
 
-    if isinstance(atoms[0], tuple):
-        contextualized_atoms: list[tuple[ProblogAtom, ProblogAtom]] = []
-        for atom, negated_atom in atoms:
-            contextualized_atoms.append(
-                (
-                    ProblogAtom(
-                        atom=atom.atom,
-                        probability=atom.probability,
-                        context=_combine_context(atom.context, document_text),
-                    ),
-                    ProblogAtom(
-                        atom=negated_atom.atom,
-                        probability=negated_atom.probability,
-                        context=_combine_context(negated_atom.context, document_text),
-                    ),
-                )
+    first = atoms[0]
+    if isinstance(first, tuple):
+        tuple_atoms = cast(list[tuple[ProblogAtom, ProblogAtom]], atoms)
+        return [
+            (
+                _clone_atom_with_context(atom, document_text),
+                _clone_atom_with_context(negated_atom, document_text),
             )
-        return contextualized_atoms
+            for atom, negated_atom in tuple_atoms
+        ]
 
-    contextualized_atoms: list[ProblogAtom] = []
-    for atom in atoms:
-        contextualized_atoms.append(
-            ProblogAtom(
-                atom=atom.atom,
-                probability=atom.probability,
-                context=_combine_context(atom.context, document_text),
-            )
-        )
-    return contextualized_atoms
+    plain_atoms = cast(list[ProblogAtom], atoms)
+    return [_clone_atom_with_context(atom, document_text) for atom in plain_atoms]
 
 
 def score_candidate_documents(
@@ -163,7 +199,7 @@ def build_record_result(
     )
     ranked_entities = [entity for entity, _ in ranked]
 
-    record_result = {
+    record_result: dict[str, Any] = {
         "query": query,
         "retrieved_entities": retrieved_entities,
         "retrieval_scores": retrieval_scores,
@@ -242,8 +278,6 @@ def run_pipeline(
     _mlflow_active = False
     if config.mlflow_experiment is not None:
         try:
-            import mlflow  # lazy import — only required when tracking is enabled
-
             mlflow.set_experiment(config.mlflow_experiment)
             mlflow.start_run(nested=True)
             mlflow.log_params(

@@ -1,10 +1,18 @@
 import logging
+from typing import Self
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.problog_models.problog_models import ProblogAtom
+
+logger = logging.getLogger(__name__)
 
 
 class TrueFalseLLMEstimator(BaseEstimator):
@@ -21,16 +29,13 @@ class TrueFalseLLMEstimator(BaseEstimator):
 
     def __init__(
         self,
-        model: AutoModelForCausalLM,
-        tokenizer: AutoTokenizer,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizerBase,
         device: str = "cuda",
         true_token: str = " True",
         false_token: str = " False",
-    ):
-        # Initialise base estimator logic
+    ) -> None:
         super().__init__(model=model, tokenizer=tokenizer, device=device)
-
-        # Extra fields specific to this subclass
         self.true_token = true_token
         self.false_token = false_token
 
@@ -42,7 +47,7 @@ class TrueFalseLLMEstimator(BaseEstimator):
         true_token: str = " True",
         false_token: str = " False",
         **kwargs,
-    ) -> "TrueFalseLLMEstimator":
+    ) -> Self:
         """Load TrueFalseLLMEstimator with True/False token configuration.
 
         Args:
@@ -55,10 +60,12 @@ class TrueFalseLLMEstimator(BaseEstimator):
         Returns:
             Initialized TrueFalseLLMEstimator with specified tokens
         """
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
         # Use device_map="auto" to let accelerate handle device placement
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name, device_map="auto", **kwargs
+        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
+            model_name,
+            device_map="auto",
+            **kwargs,
         )
         return cls(
             model=model,
@@ -95,7 +102,6 @@ class TrueFalseLLMEstimator(BaseEstimator):
         Returns:
             tuple[float, float]: Probabilities of True and False tokens.
         """
-        logger = logging.getLogger(__name__)
         try:
             # NOTE: Don't use .to(self.device) with device_map="auto"
             # Let accelerate handle device placement automatically
@@ -148,9 +154,7 @@ class TrueFalseLLMEstimator(BaseEstimator):
 
             return t_prob, f_prob
         except Exception as exc:  # noqa: BLE001
-            logging.getLogger(__name__).warning(
-                "Failed to compute token probabilities: %s", exc
-            )
+            logger.warning("Failed to compute token probabilities: %s", exc)
             return 0.0, 0.0
 
     def score_probability(
@@ -168,20 +172,22 @@ class TrueFalseLLMEstimator(BaseEstimator):
         Returns:
             dict[str, float]: Dictionary mapping predicates to their probabilities of being True.
         """
-        logger = logging.getLogger(__name__)
         results = []
         for predicate in predicates:
-            prompt = self._build_true_false_prompt(predicate, entity)
-            t_prob, f_prob = self.get_probability_for_prompt(prompt)
-            # if both probabilities zero, warn once with prompt sample
-            if t_prob == 0.0 and f_prob == 0.0:
-                logger.debug(
-                    "LLM returned zero probs for prompt sample: %r",
-                    (prompt[:200] + "...") if len(prompt) > 200 else prompt,
+            if isinstance(predicate, ProblogAtom):
+                prompt = self._build_true_false_prompt(predicate, entity)
+                t_prob, f_prob = self.get_probability_for_prompt(prompt)
+                # if both probabilities zero, warn once with prompt sample
+                if t_prob == 0.0 and f_prob == 0.0:
+                    logger.debug(
+                        "LLM returned zero probs for prompt sample: %r",
+                        (prompt[:200] + "...") if len(prompt) > 200 else prompt,
+                    )
+                results.append(
+                    ProblogAtom(
+                        atom=predicate.atom,
+                        probability=t_prob,
+                        context=predicate.context,
+                    )
                 )
-            results.append(
-                ProblogAtom(
-                    atom=predicate.atom, probability=t_prob, context=predicate.context
-                )
-            )
         return results

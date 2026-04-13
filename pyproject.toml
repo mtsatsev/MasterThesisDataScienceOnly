@@ -70,9 +70,11 @@ name = "pytorch-cu128"
 url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
+[tool.pyrefly]
+project-excludes = ["llm_bayesian_reasoning/notebooks/*"]
+
+[tool.pyrefly.errors]
+not-callable = false
 
 [tool.hatch.build.targets.wheel]
-# Replace with your package path; common options:
-# - `src/thesis_llm_app` if you use a src layout
-# - `thesis_llm_app` if the package is at project root
 packages = ["llm_bayesian_reasoning"]

@@ -110,6 +110,7 @@ class ProblogFormula(BaseModel):
     )
     model_config = ConfigDict(arbitrary_types_allowed=True, extra="forbid")
 
+    @property
     @computed_field
     def problog_formula_format(self) -> str:
         """

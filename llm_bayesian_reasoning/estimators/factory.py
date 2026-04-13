@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.likelihood_based_estimator import (
@@ -23,10 +28,12 @@ def _common_model_kwargs(estimator_config: EstimatorConfig) -> dict[str, Any]:
 
 def load_model_and_tokenizer_from_config(
     estimator_config: EstimatorConfig,
-) -> tuple[AutoModelForCausalLM, AutoTokenizer]:
+) -> tuple[AutoModelForCausalLM, PreTrainedTokenizerBase]:
     """Load shared model resources for one or more estimator variants."""
-    tokenizer = AutoTokenizer.from_pretrained(estimator_config.model_name)
-    model = AutoModelForCausalLM.from_pretrained(
+    tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(
+        estimator_config.model_name
+    )
+    model: AutoModelForCausalLM = AutoModelForCausalLM.from_pretrained(
         estimator_config.model_name,
         device_map="auto",
         **_common_model_kwargs(estimator_config),
@@ -36,8 +43,8 @@ def load_model_and_tokenizer_from_config(
 
 def create_estimator_from_components(
     estimator_config: EstimatorConfig,
-    model: AutoModelForCausalLM,
-    tokenizer: AutoTokenizer,
+    model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
 ) -> BaseEstimator:
     """Create an estimator wrapper from shared model resources."""
     etype = estimator_config.estimator_type

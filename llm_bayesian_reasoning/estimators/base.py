@@ -1,6 +1,11 @@
 from logging import getLogger
 
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 
 from llm_bayesian_reasoning.problog_models.problog_models import ProblogAtom
 
@@ -10,8 +15,8 @@ logger = getLogger(__name__)
 class BaseEstimator:
     def __init__(
         self,
-        model: AutoModelForCausalLM,
-        tokenizer: AutoTokenizer,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizerBase,
         device: str = "cuda",
     ):
         self.model = model
@@ -40,7 +45,7 @@ class BaseEstimator:
 
         import torch
 
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
 
         # Optimize device_map strategy based on available VRAM
         available_vram_gb = 0
@@ -52,7 +57,7 @@ class BaseEstimator:
 
         # Use device_map="auto" with CPU offloading for better memory management
         # This prevents model from staying entirely on CPU
-        model = AutoModelForCausalLM.from_pretrained(
+        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map="auto",
             offload_folder=os.path.expanduser("~/.cache/huggingface/offload"),
