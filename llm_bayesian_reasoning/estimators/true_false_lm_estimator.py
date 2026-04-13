@@ -1,15 +1,17 @@
 import logging
-from typing import Self
 
 import torch
 from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
+from llm_bayesian_reasoning.estimators.scoring_inputs import (
+    ContrastiveScoringInput,
+    PositiveScoringInput,
+    ScoringInput,
+)
 from llm_bayesian_reasoning.problog_models.problog_models import ProblogAtom
 
 logger = logging.getLogger(__name__)
@@ -38,42 +40,6 @@ class TrueFalseLLMEstimator(BaseEstimator):
         super().__init__(model=model, tokenizer=tokenizer, device=device)
         self.true_token = true_token
         self.false_token = false_token
-
-    @classmethod
-    def from_pretrained(
-        cls,
-        model_name: str = "microsoft/phi-2",
-        device: str = "cuda",
-        true_token: str = " True",
-        false_token: str = " False",
-        **kwargs,
-    ) -> Self:
-        """Load TrueFalseLLMEstimator with True/False token configuration.
-
-        Args:
-            model_name: HuggingFace model identifier
-            device: Target device (cuda/cpu)
-            true_token: Token for True class (default: " True")
-            false_token: Token for False class (default: " False")
-            **kwargs: Additional kwargs like quantization_config for from_pretrained
-
-        Returns:
-            Initialized TrueFalseLLMEstimator with specified tokens
-        """
-        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
-        # Use device_map="auto" to let accelerate handle device placement
-        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="auto",
-            **kwargs,
-        )
-        return cls(
-            model=model,
-            tokenizer=tokenizer,
-            device=device,
-            true_token=true_token,
-            false_token=false_token,
-        )
 
     def _build_true_false_prompt(self, predicate: ProblogAtom, entity: str) -> str:
         statement = predicate.to_prompt(entity).strip()
@@ -159,7 +125,7 @@ class TrueFalseLLMEstimator(BaseEstimator):
 
     def score_probability(
         self,
-        predicates: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+        predicates: list[ScoringInput],
         entity: str,
     ) -> list[ProblogAtom]:
         """
@@ -174,10 +140,15 @@ class TrueFalseLLMEstimator(BaseEstimator):
         """
         results = []
         for predicate in predicates:
-            if isinstance(predicate, ProblogAtom):
-                prompt = self._build_true_false_prompt(predicate, entity)
+            if isinstance(predicate, ContrastiveScoringInput):
+                raise ValueError(
+                    "TrueFalseLLMEstimator does not support contrastive scoring inputs"
+                )
+
+            positive_input = predicate
+            if isinstance(positive_input, PositiveScoringInput):
+                prompt = self._build_true_false_prompt(positive_input.atom, entity)
                 t_prob, f_prob = self.get_probability_for_prompt(prompt)
-                # if both probabilities zero, warn once with prompt sample
                 if t_prob == 0.0 and f_prob == 0.0:
                     logger.debug(
                         "LLM returned zero probs for prompt sample: %r",
@@ -185,9 +156,9 @@ class TrueFalseLLMEstimator(BaseEstimator):
                     )
                 results.append(
                     ProblogAtom(
-                        atom=predicate.atom,
+                        atom=positive_input.atom.atom,
                         probability=t_prob,
-                        context=predicate.context,
+                        context=positive_input.atom.context,
                     )
                 )
         return results

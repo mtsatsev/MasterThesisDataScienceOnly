@@ -1,12 +1,16 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, cast, overload
+from typing import Any
 
 import mlflow
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
+from llm_bayesian_reasoning.estimators.scoring_inputs import (
+    ScoringInput,
+    clone_scoring_inputs_with_document_context,
+)
 from llm_bayesian_reasoning.pipeline.config import (
     LogicBackendType,
     PipelineConfig,
@@ -21,6 +25,7 @@ from llm_bayesian_reasoning.pipeline.metrics import (
     compute_metrics,
     compute_record_metrics,
 )
+from llm_bayesian_reasoning.pipeline.results_io import write_result_row
 from llm_bayesian_reasoning.problog_models.problog_models import (
     ProblogAtom,
     ProblogFormula,
@@ -56,92 +61,8 @@ def build_or_load_index(
     )
 
 
-def _combine_context(
-    atom_context: str | None,
-    document_text: str | None,
-    separator: str = "\n\n",
-) -> str | None:
-    normalized_document_text = document_text.strip() if document_text else None
-    if not normalized_document_text:
-        return atom_context
-    if atom_context is None:
-        return normalized_document_text
-    return atom_context + separator + normalized_document_text
-
-
-@overload
-def _clone_atoms_with_document_context(
-    atoms: list[ProblogAtom],
-    document_text: str | None,
-) -> list[ProblogAtom]: ...
-
-
-@overload
-def _clone_atoms_with_document_context(
-    atoms: list[tuple[ProblogAtom, ProblogAtom]],
-    document_text: str | None,
-) -> list[tuple[ProblogAtom, ProblogAtom]]: ...
-
-
-def _clone_atom_with_context(
-    atom: ProblogAtom,
-    document_text: str | None,
-) -> ProblogAtom:
-    """
-    Clone a single ProblogAtom, appending retrieved document text to its context (if any).
-
-    Args:
-        atom (ProblogAtom): The atom to clone.
-        document_text (str | None): The retrieved document text to append to the atom's context.
-
-    Returns:
-        ProblogAtom: A new ProblogAtom with the updated context.
-    """
-    return ProblogAtom(
-        atom=atom.atom,
-        probability=atom.probability,
-        context=_combine_context(atom.context, document_text),
-    )
-
-
-def _clone_atoms_with_document_context(
-    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
-    document_text: str | None,
-) -> list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]:
-    """
-    Clone a list of ProblogAtoms (or tuples of atoms), appending retrieved document text
-        to their contexts.
-
-    Args:
-        atoms (list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]): The atoms to
-            clone.
-        document_text (str | None): The retrieved document text to append to each
-            atom's context.
-
-    Returns:
-        list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]: A new list of atoms
-            with updated contexts.
-    """
-    if not atoms:
-        return atoms
-
-    first = atoms[0]
-    if isinstance(first, tuple):
-        tuple_atoms = cast(list[tuple[ProblogAtom, ProblogAtom]], atoms)
-        return [
-            (
-                _clone_atom_with_context(atom, document_text),
-                _clone_atom_with_context(negated_atom, document_text),
-            )
-            for atom, negated_atom in tuple_atoms
-        ]
-
-    plain_atoms = cast(list[ProblogAtom], atoms)
-    return [_clone_atom_with_context(atom, document_text) for atom in plain_atoms]
-
-
 def score_candidate_documents(
-    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+    atoms: list[ScoringInput],
     formula: ProblogFormula,
     candidate_documents: list[ScoredDocument],
     estimator: BaseEstimator,
@@ -155,7 +76,7 @@ def score_candidate_documents(
         entity = document.title
         scoring_atoms = atoms
         if include_retrieved_text:
-            scoring_atoms = _clone_atoms_with_document_context(
+            scoring_atoms = clone_scoring_inputs_with_document_context(
                 atoms,
                 document.text,
             )
@@ -176,7 +97,7 @@ def score_candidate_documents(
 
 def build_record_result(
     query: str,
-    atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+    atoms: list[ScoringInput],
     retrieved_documents: list[ScoredDocument],
     entity_scores: dict[str, float],
     top_k: int,
@@ -353,9 +274,7 @@ def run_pipeline(
 
             try:
                 query: str = record["query"]
-                atoms: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]] = (
-                    record["atoms"]
-                )
+                atoms: list[ScoringInput] = record["atoms"]
                 formula: ProblogFormula = record["problog_formula"]
 
                 # --- Step 1: BM25 retrieval (top-N) ---
@@ -372,7 +291,7 @@ def run_pipeline(
                         "reranked_pool_size": 0,
                         "metric_top_k": config.top_k,
                     }
-                    _write_result(out_f, record_id, results[record_id])
+                    write_result_row(out_f, record_id, results[record_id])
                     continue
 
                 # --- Steps 2–3: LLM scoring + Problog evaluation ---
@@ -405,7 +324,7 @@ def run_pipeline(
                 results[record_id] = record_result
 
                 # --- Step 5: Checkpoint ---
-                _write_result(out_f, record_id, record_result)
+                write_result_row(out_f, record_id, record_result)
                 logger.info(
                     "Record %s done. Top entity: %r (%.4f)",
                     record_id,
@@ -495,9 +414,3 @@ def run_pipeline(
             logger.warning("MLflow end-run cleanup failed — skipping.", exc_info=True)
 
     return {"results": results, "metrics": metrics}
-
-
-def _write_result(file_handle, record_id, record_result: dict) -> None:
-    row = {"id": record_id, **record_result}
-    file_handle.write(json.dumps(row, ensure_ascii=False) + "\n")
-    file_handle.flush()

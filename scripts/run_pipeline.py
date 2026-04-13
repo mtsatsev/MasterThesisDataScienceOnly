@@ -23,96 +23,15 @@ from llm_bayesian_reasoning.pipeline.config import (
     PipelineConfig,
     RetrieverType,
 )
-from llm_bayesian_reasoning.pipeline.pipeline import run_pipeline
-from llm_bayesian_reasoning.problog_models.problog_models import (
-    ProblogAtom,
-    ProblogFormula,
+from llm_bayesian_reasoning.pipeline.record_loader import (
+    load_preprocessed_records,
+    materialize_records_for_estimator,
 )
+from llm_bayesian_reasoning.pipeline.pipeline import run_pipeline
 from llm_bayesian_reasoning.retrievers.base_retriever import BaseRetriever
 from llm_bayesian_reasoning.retrievers.factory import build_or_load_retriever
 
 logger = logging.getLogger("run_pipeline")
-
-
-def _normalize_placeholder(value: str) -> str:
-    return value.replace("{x}", "{X}")
-
-
-def _build_atom(atom: str) -> ProblogAtom:
-    return ProblogAtom(atom=_normalize_placeholder(atom))
-
-
-def _load_preprocessed(
-    path: Path,
-    estimator_type: EstimatorType,
-    limit: int | None = None,
-    use_metadata_ground_truth: bool = False,
-) -> tuple[dict, dict | None]:
-    """Load preprocessed JSONL into the pipeline's expected in-memory format.
-
-    Returns:
-        (data_dict, ground_truth_dict_or_None)
-    """
-    data: dict = {}
-    ground_truth: dict = {}
-
-    with path.open(encoding="utf-8") as f:
-        for i, line in enumerate(f):
-            if limit is not None and i >= limit:
-                break
-            try:
-                doc = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
-            rid = doc.get("id")
-            if rid is None:
-                continue
-
-            query = doc.get("query") or doc.get("original_query") or ""
-            parsed = doc.get("parsed", {})
-            atoms_raw = parsed.get("atoms", [])
-            negated_atoms_raw = parsed.get("negated_atoms", [])
-            logical = parsed.get("logical query") or parsed.get("logical_query") or ""
-
-            atoms_text = [atom for atom in atoms_raw if isinstance(atom, str)]
-            atoms_objs: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]
-            if estimator_type == EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE:
-                negated_atoms_text = [
-                    atom for atom in negated_atoms_raw if isinstance(atom, str)
-                ]
-                if not negated_atoms_text:
-                    raise ValueError(
-                        f"Record {rid} is missing parsed.negated_atoms required for "
-                        "the contrastive estimator"
-                    )
-                if len(atoms_text) != len(negated_atoms_text):
-                    raise ValueError(
-                        f"Record {rid} has {len(atoms_text)} atoms but "
-                        f"{len(negated_atoms_text)} negated_atoms"
-                    )
-                atoms_objs = [
-                    (_build_atom(atom), _build_atom(negated_atom))
-                    for atom, negated_atom in zip(atoms_text, negated_atoms_text)
-                ]
-            else:
-                atoms_objs = [_build_atom(atom) for atom in atoms_text]
-
-            formula = ProblogFormula(formula=_normalize_placeholder(logical))
-
-            data[rid] = {
-                "query": query,
-                "atoms": atoms_objs,
-                "problog_formula": formula,
-            }
-
-            if use_metadata_ground_truth:
-                meta = doc.get("metadata", {})
-                rel = meta.get("relevance_ratings") or {}
-                if isinstance(rel, dict):
-                    ground_truth[rid] = list(rel.keys())
-
-    return data, ground_truth if use_metadata_ground_truth else None
 
 
 def _make_results_folder(
@@ -313,11 +232,14 @@ def main():
 
     # Load data
     logger.info("Loading preprocessed data from %s", args.data_file)
-    data, ground_truth = _load_preprocessed(
+    loaded_records, ground_truth = load_preprocessed_records(
         args.data_file,
-        estimator_type=estimator_cfg.estimator_type,
         limit=args.limit,
         use_metadata_ground_truth=args.use_metadata_ground_truth,
+    )
+    data = materialize_records_for_estimator(
+        loaded_records,
+        estimator_cfg.estimator_type,
     )
     if args.limit is not None:
         logger.info("Loaded %d records (limited)", len(data))

@@ -1,12 +1,15 @@
 import torch
 from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
+from llm_bayesian_reasoning.estimators.scoring_inputs import (
+    ContrastiveScoringInput,
+    PositiveScoringInput,
+    ScoringInput,
+)
 from llm_bayesian_reasoning.problog_models.problog_models import ProblogAtom
 
 LABEL_IGNORE = -100
@@ -30,33 +33,6 @@ class LikelihoodBasedEstimator(BaseEstimator):
     ):
         super().__init__(model=model, tokenizer=tokenizer, device=device)
         self.contrastive_temperature = contrastive_temperature
-
-    @classmethod
-    def from_pretrained(
-        cls,
-        model_name: str = "microsoft/phi-2",
-        device: str = "cuda",
-        contrastive_temperature: float = 1.0,
-        **kwargs,
-    ) -> "LikelihoodBasedEstimator":
-        """Load a pre-trained model and tokenizer to create a LikelihoodBasedEstimator.
-
-        Args:
-            model_name (str): HuggingFace model identifier.
-            device (str): Target device (cuda/cpu).
-            contrastive_temperature (float): Temperature for contrastive scoring.
-            **kwargs: Additional kwargs for from_pretrained (e.g., quantization_config).
-        """
-        tokenizer: PreTrainedTokenizerBase = AutoTokenizer.from_pretrained(model_name)
-        model: PreTrainedModel = AutoModelForCausalLM.from_pretrained(
-            model_name, device_map="auto", **kwargs
-        )
-        return cls(
-            model=model,
-            tokenizer=tokenizer,
-            device=device,
-            contrastive_temperature=contrastive_temperature,
-        )
 
     def _conditional_loss(self, atom: ProblogAtom, entity: str) -> float:
         """
@@ -119,15 +95,14 @@ class LikelihoodBasedEstimator(BaseEstimator):
 
     def score_probability(
         self,
-        predicates: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]],
+        predicates: list[ScoringInput],
         entity: str,
     ) -> list[ProblogAtom]:
         """
         Score a list of predicates and return their probabilities of being True.
 
         Args:
-            predicates (list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]): List
-                of predicates to score.
+            predicates (list[ScoringInput]): List of scoring inputs to score.
             entity (str): The entity to replace the placeholder '{X}'.
 
         Returns:
@@ -138,23 +113,26 @@ class LikelihoodBasedEstimator(BaseEstimator):
             return scored_predicates
 
         for inp in predicates:
-            if isinstance(inp, tuple) and len(inp) == 2:
-                atom, negated_atom = inp
-                probability = self.prob_contrastive(atom, negated_atom, entity)
+            if isinstance(inp, ContrastiveScoringInput):
+                probability = self.prob_contrastive(
+                    inp.atom,
+                    inp.negated_atom,
+                    entity,
+                )
                 scored_predicates.append(
                     ProblogAtom(
-                        atom=atom.atom,
+                        atom=inp.atom.atom,
                         probability=probability,
-                        context=atom.context,
+                        context=inp.atom.context,
                     )
                 )
-            elif isinstance(inp, ProblogAtom):
-                probability = self.perplexity(inp, entity)
+            elif isinstance(inp, PositiveScoringInput):
+                probability = self.perplexity(inp.atom, entity)
                 scored_predicates.append(
                     ProblogAtom(
-                        atom=inp.atom,
+                        atom=inp.atom.atom,
                         probability=probability,
-                        context=inp.context,
+                        context=inp.atom.context,
                     )
                 )
         return scored_predicates
