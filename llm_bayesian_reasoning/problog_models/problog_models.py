@@ -9,6 +9,11 @@ from pydantic import (
 )
 
 _predicate_mismatch_warned: set[tuple[frozenset, frozenset]] = set()
+_formula_parentheses_warned: set[str] = set()
+_FORMULA_ATOM_PATTERN = re.compile(
+    r"\{X\}[^()]*?(?=(\bAND\b|\bOR\b|\bNOT\b|\)|$))",
+    flags=re.IGNORECASE,
+)
 
 
 def phrase_to_predicate_name(phrase: str) -> str:
@@ -28,6 +33,40 @@ def phrase_to_predicate_name(phrase: str) -> str:
     if not s or not s[0].isalpha():
         s = "p_" + s
     return s
+
+
+def _extract_formula_phrases(formula: str) -> list[str]:
+    phrases: list[str] = []
+    for match in _FORMULA_ATOM_PATTERN.finditer(formula):
+        phrase = match.group(0).strip()
+        if phrase and phrase not in phrases:
+            phrases.append(phrase)
+    return phrases
+
+
+def _balance_parentheses(expression: str) -> tuple[str, int, int]:
+    balanced: list[str] = []
+    open_count = 0
+    skipped_closing = 0
+
+    for char in expression:
+        if char == "(":
+            open_count += 1
+            balanced.append(char)
+            continue
+        if char == ")":
+            if open_count == 0:
+                skipped_closing += 1
+                continue
+            open_count -= 1
+            balanced.append(char)
+            continue
+        balanced.append(char)
+
+    if open_count:
+        balanced.extend(")" for _ in range(open_count))
+
+    return "".join(balanced), skipped_closing, open_count
 
 
 class ProblogAtom(BaseModel):
@@ -126,23 +165,14 @@ class ProblogFormula(BaseModel):
                 \\+ dog({X}).
         """
 
-        # 1) Find all atomic phrases of the form "{X} ... <before next AND/OR/NOT/)/end>"
-        atom_pattern = re.compile(
-            r"\{X\}[^()]*?(?=(\bAND\b|\bOR\b|\bNOT\b|\)|$))",
-            flags=re.IGNORECASE,
-        )
-
-        phrases: list[str] = []
-        for m in atom_pattern.finditer(self.formula):
-            phrase = m.group(0).strip()
-            if phrase not in phrases:
-                phrases.append(phrase)
+        normalized_formula = self._normalize_formula_text(self.formula)
+        phrases = _extract_formula_phrases(normalized_formula)
 
         # 2) Map each phrase to a predicate name
         phrase_to_pred = {p: phrase_to_predicate_name(p) for p in phrases}
 
         # 3) Replace phrases with predicate({X})
-        prolog_body = self.formula
+        prolog_body = normalized_formula
         for phrase, pred in phrase_to_pred.items():
             # pylint: disable=maybe-no-member
             prolog_body = prolog_body.replace(phrase, f"{pred}({{X}})")
@@ -161,6 +191,67 @@ class ProblogFormula(BaseModel):
         result = f"{self.head}({{X}}) :-\n    {prolog_body}."
         return result
 
+    def _normalize_formula_text(self, formula: str) -> str:
+        normalized_formula, skipped_closing, added_closing = _balance_parentheses(
+            formula
+        )
+        if skipped_closing or added_closing:
+            cache_key = f"{formula}|{skipped_closing}|{added_closing}"
+            if cache_key not in _formula_parentheses_warned:
+                _formula_parentheses_warned.add(cache_key)
+                logging.getLogger(__name__).warning(
+                    "Auto-balanced formula parentheses by dropping %d unmatched ')' and adding %d trailing ')' for formula: %s",
+                    skipped_closing,
+                    added_closing,
+                    formula,
+                )
+        return normalized_formula
+
+    def _validate_formula_atoms(
+        self,
+        formula: str,
+        atoms: list[ProblogAtom],
+    ) -> None:
+        provided_atoms = {atom.atom for atom in atoms}
+        missing_phrases = [
+            phrase
+            for phrase in _extract_formula_phrases(formula)
+            if phrase not in provided_atoms
+        ]
+        if missing_phrases:
+            raise ValueError(
+                "Formula references atoms that are not present in the supplied atom "
+                f"list: {missing_phrases}"
+            )
+
+    def _formula_to_rule_from_atoms(
+        self,
+        atoms: list[ProblogAtom],
+    ) -> str:
+        body = self._normalize_formula_text(str(self.formula))
+        self._validate_formula_atoms(body, atoms)
+
+        atom_map = sorted(
+            ((atom.atom, atom.problog_atom_format) for atom in atoms),
+            key=lambda x: len(x[0]),
+            reverse=True,
+        )
+
+        for atom_text, predicate in atom_map:
+            body = body.replace(atom_text, f"{predicate}({{X}})")
+
+        body = re.sub(r"\bAND\b", ",", body)
+        body = re.sub(r"\bOR\b", ";", body)
+        body = re.sub(r"\bNOT\s*\(", r"\\+(", body)
+
+        if "{X}" in body:
+            raise ValueError(
+                "Formula still contains unresolved placeholder text after atom "
+                f"replacement: {body}"
+            )
+
+        return f"{self.head}({{X}}) :-\n    {body}."
+
     def to_problog(self, atoms: list[ProblogAtom], entity: str) -> str:
         """
         Convert the ProblogFormula to a Problog string representation,
@@ -176,7 +267,9 @@ class ProblogFormula(BaseModel):
 
         entity_str = entity if entity is not None else "{X}"
         propositions = "\n".join(atom.to_proposition(entity) for atom in atoms)
-        formula_rule = self.problog_formula_format.replace("{X}", f"{entity_str!r}")
+        formula_rule = self._formula_to_rule_from_atoms(atoms).replace(
+            "{X}", f"{entity_str!r}"
+        )
         query_directive = f"query({self.head}({entity_str!r}))."
         provided_predicates = frozenset(atom.problog_atom_format for atom in atoms)
         formula_predicates = frozenset(re.findall(r"(\w+)\(", formula_rule)) - {
@@ -206,6 +299,8 @@ class ProblogFormula(BaseModel):
         """
         entity_str = entity if entity is not None else "{X}"
         propositions = "\n".join(atom.to_deepproblog_fact(entity) for atom in atoms)
-        formula_rule = self.problog_formula_format.replace("{X}", f"{entity_str!r}")
+        formula_rule = self._formula_to_rule_from_atoms(atoms).replace(
+            "{X}", f"{entity_str!r}"
+        )
         query_directive = f"query({self.head}({entity_str!r}))."
         return propositions + "\n" + formula_rule + "\n" + query_directive
