@@ -10,21 +10,57 @@
       "retriever_type": "BM25",
       "index_path": "index/bm25",
       "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
-      "retrieval_pool_size": 50
+      "retrieval_pool_size": 200
     }
   ],
   "variants": [
     {
       "name": "bm25_tf_ctx",
       "retriever_name": "bm25-main",
-      "top_n": 50,
+      "top_n": 200,
       "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "meta-llama/Meta-Llama-3-8B-Instruct",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
         "include_retrieved_text": true,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
+      }
+    },
+    {
+      "name": "bm25_tf_no_ctx",
+      "retriever_name": "bm25-main",
+      "top_n": 200,
+      "top_k": 10,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": false,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
+      }
+    },
+    {
+      "name": "bm25_perplexity_no_ctx",
+      "retriever_name": "bm25-main",
+      "top_n": 200,
+      "top_k": 10,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
+        "device": "cuda",
+        "estimator_type": "Perplexity",
+        "include_retrieved_text": false,
         "quantization": {
           "load_in_4bit": true,
           "bnb_4bit_quant_type": "nf4",
