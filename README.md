@@ -10,9 +10,13 @@ Two CLI helpers are available under `scripts/` to build retriever indexes from a
 Build a BM25 index into a target folder:
 
 ```bash
-python scripts/build_bm25_index.py \
+nohup python scripts/build_bm25_index.py \
 	--documents-path llm_bayesian_reasoning/data/index_data/documents.jsonl \
-	--index-path llm_bayesian_reasoning/data/index_data/bm25_index
+	--index-path llm_bayesian_reasoning/data/index_data/bm25_index \
+	--batch-size 20 \
+	--log-level INFO \
+	--overwrite \
+	> build_bm25_index.log 2>&1 &
 ```
 
 Useful options:
@@ -27,11 +31,12 @@ Useful options:
 Build an E5 dense index into a target folder:
 
 ```bash
-python scripts/build_e5_index.py \
+nohup python scripts/build_e5_index.py \
 	--documents-path llm_bayesian_reasoning/data/index_data/documents.jsonl \
 	--index-path llm_bayesian_reasoning/data/index_data/e5_index \
 	--model-name intfloat/e5-base-v2 \
-	--device cuda
+	--device cuda \
+  	> build_e5_index.log 2>&1 &
 ```
 
 Useful options:

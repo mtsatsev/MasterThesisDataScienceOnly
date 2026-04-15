@@ -2,6 +2,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Self
 
+import torch
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -10,6 +11,21 @@ from pydantic import (
     model_validator,
 )
 from transformers import BitsAndBytesConfig
+
+
+def _resolve_torch_dtype(value: Any) -> Any:
+    """Convert JSON-safe torch dtype strings into torch.dtype instances."""
+    if not isinstance(value, str):
+        return value
+
+    normalized = value.removeprefix("torch.")
+    dtype = getattr(torch, normalized, None)
+    if isinstance(dtype, torch.dtype):
+        return dtype
+
+    raise ValueError(
+        f"Unsupported torch dtype string for quantization config: {value!r}"
+    )
 
 
 class EstimatorType(str, Enum):
@@ -75,7 +91,11 @@ class EstimatorConfig(BaseModel):
         description="Include retrieved document text in Problog atom context",
     )
     quantization: BitsAndBytesConfig = Field(
-        default_factory=lambda: BitsAndBytesConfig(load_in_4bit=True)
+        default_factory=lambda: BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16,
+        )
     )
 
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
@@ -88,11 +108,20 @@ class EstimatorConfig(BaseModel):
     ) -> BitsAndBytesConfig:
         """Allow quantization to be passed as a JSON object."""
         if value is None:
-            return BitsAndBytesConfig(load_in_4bit=True)
+            return BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+            )
         if isinstance(value, BitsAndBytesConfig):
             return value
         if isinstance(value, dict):
-            return BitsAndBytesConfig(**value)
+            normalized_value = dict(value)
+            if "bnb_4bit_compute_dtype" in normalized_value:
+                normalized_value["bnb_4bit_compute_dtype"] = _resolve_torch_dtype(
+                    normalized_value["bnb_4bit_compute_dtype"]
+                )
+            return BitsAndBytesConfig(**normalized_value)
         raise TypeError("quantization must be a BitsAndBytesConfig or a JSON object")
 
     @model_validator(mode="after")

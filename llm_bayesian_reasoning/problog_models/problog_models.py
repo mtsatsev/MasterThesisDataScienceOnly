@@ -140,9 +140,7 @@ def _normalize_formula_text_for_atoms(
 
     if "{X} is a drama film" not in atom_texts:
         drama_variants = sorted(
-            atom_text
-            for atom_text in atom_texts
-            if atom_text.endswith(" drama film")
+            atom_text for atom_text in atom_texts if atom_text.endswith(" drama film")
         )
         if drama_variants:
             drama_replacement = " OR ".join(
@@ -292,7 +290,9 @@ class ProblogFormula(BaseModel):
         atom_lookup: dict[str, str],
     ) -> list[tuple[str, str]]:
         text = _normalize_formula_text_for_atoms(str(self.formula), set(atom_lookup))
-        ordered_atoms = sorted(atom_lookup.items(), key=lambda item: len(item[0]), reverse=True)
+        ordered_atoms = sorted(
+            atom_lookup.items(), key=lambda item: len(item[0]), reverse=True
+        )
         tokens: list[tuple[str, str]] = []
         position = 0
 
@@ -313,7 +313,9 @@ class ProblogFormula(BaseModel):
 
             operator_match = re.match(r"(?i)(AND|OR|NOT)\b", text[position:])
             if operator_match:
-                tokens.append((operator_match.group(1).upper(), operator_match.group(1).upper()))
+                tokens.append(
+                    (operator_match.group(1).upper(), operator_match.group(1).upper())
+                )
                 position += operator_match.end()
                 continue
 
@@ -334,13 +336,15 @@ class ProblogFormula(BaseModel):
             if text.startswith("{X}", position):
                 phrase, next_position = _consume_formula_phrase(text, position)
                 if not phrase:
-                    raise ValueError(f"Unable to parse formula near position {position}: {text[position:position + 40]!r}")
+                    raise ValueError(
+                        f"Unable to parse formula near position {position}: {text[position : position + 40]!r}"
+                    )
                 tokens.append(("ATOM", phrase_to_predicate_name(phrase)))
                 position = next_position
                 continue
 
             raise ValueError(
-                f"Unexpected formula token near position {position}: {text[position:position + 40]!r}"
+                f"Unexpected formula token near position {position}: {text[position : position + 40]!r}"
             )
 
         return tokens
