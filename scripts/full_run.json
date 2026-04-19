@@ -7,156 +7,204 @@
     {
       "name": "bm25-main",
       "retriever_type": "BM25",
-      "index_path": "llm_bayesian_reasoning/data/index_data/bm25_index_test_200",
+      "index_path": "index/bm25",
       "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
       "batch_size": 1000,
-      "index_limit": 200,
-      "retrieval_pool_size": 30
+      "retrieval_pool_size": 50
     },
     {
       "name": "e5-main",
       "retriever_type": "E5",
-      "index_path": "llm_bayesian_reasoning/data/index_data/e5_index_test_200",
+      "index_path": "index/e5",
       "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
       "batch_size": 1000,
-      "index_limit": 200,
       "retriever_model_name": "intfloat/e5-base-v2",
-      "retrieval_pool_size": 30
+      "retrieval_pool_size": 50
     }
   ],
   "variants": [
     {
       "name": "bm25_tf_noctx",
       "retriever_name": "bm25-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
-        "include_retrieved_text": false
+        "include_retrieved_text": false,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "bm25_tf_ctx",
       "retriever_name": "bm25-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
-        "include_retrieved_text": true
+        "include_retrieved_text": true,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "bm25_ppl_noctx",
       "retriever_name": "bm25-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Perplexity",
-        "include_retrieved_text": false
+        "include_retrieved_text": false,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "bm25_contrastive_noctx",
       "retriever_name": "bm25-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Contrastive",
         "include_retrieved_text": false,
-        "contrastive_temperature": 1.0
+        "contrastive_temperature": 1.0,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "bm25_contrastive_ctx",
       "retriever_name": "bm25-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Contrastive",
         "include_retrieved_text": true,
-        "contrastive_temperature": 1.0
+        "contrastive_temperature": 1.0,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "e5_tf_noctx",
       "retriever_name": "e5-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
-        "include_retrieved_text": false
+        "include_retrieved_text": false,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "e5_tf_ctx",
       "retriever_name": "e5-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
-        "include_retrieved_text": true
+        "include_retrieved_text": true,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "e5_ppl_noctx",
       "retriever_name": "e5-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Perplexity",
-        "include_retrieved_text": false
+        "include_retrieved_text": false,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "e5_contrastive_noctx",
       "retriever_name": "e5-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Contrastive",
         "include_retrieved_text": false,
-        "contrastive_temperature": 1.0
+        "contrastive_temperature": 1.0,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     },
     {
       "name": "e5_contrastive_ctx",
       "retriever_name": "e5-main",
-      "top_n": 20,
-      "top_k": 5,
+      "top_n": 50,
+      "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "Contrastive",
         "include_retrieved_text": true,
-        "contrastive_temperature": 1.0
+        "contrastive_temperature": 1.0,
+        "quantization": {
+          "load_in_4bit": true,
+          "bnb_4bit_quant_type": "nf4",
+          "bnb_4bit_compute_dtype": "torch.float16"
+        }
       }
     }
   ]
