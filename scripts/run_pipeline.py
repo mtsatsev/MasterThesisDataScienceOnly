@@ -163,6 +163,12 @@ def main():
 
     p.add_argument("--model-name", type=str, default=None)
     p.add_argument(
+        "--deepproblog-model-dir",
+        type=Path,
+        default=None,
+        help="Path to a trained DeepProbLog model bundle for estimator-type DeepProbLog",
+    )
+    p.add_argument(
         "--estimator-type",
         type=str,
         choices=[e.value for e in EstimatorType],
@@ -234,12 +240,14 @@ def main():
             device=args.device,
             estimator_type=EstimatorType(args.estimator_type),
             include_retrieved_text=args.include_retrieved_text,
+            deepproblog_model_dir=args.deepproblog_model_dir,
         )
     else:
         estimator_cfg = EstimatorConfig(
             estimator_type=EstimatorType(args.estimator_type),
             device=args.device,
             include_retrieved_text=args.include_retrieved_text,
+            deepproblog_model_dir=args.deepproblog_model_dir,
         )
 
     # Create a temporary PipelineConfig to determine run naming
@@ -290,6 +298,11 @@ def main():
                 "logic_backend": args.logic_backend,
                 "device": estimator_cfg.device,
                 "include_retrieved_text": estimator_cfg.include_retrieved_text,
+                "deepproblog_model_dir": (
+                    str(estimator_cfg.deepproblog_model_dir)
+                    if estimator_cfg.deepproblog_model_dir is not None
+                    else None
+                ),
                 "mlflow_experiment": args.mlflow_experiment,
             },
             cf,
