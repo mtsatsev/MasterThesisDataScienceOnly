@@ -430,6 +430,13 @@ class ProblogFormula(BaseModel):
         parsed = self._parse_formula_tokens(tokens)
         return _ProbLogRenderer(entity_expr).visit(parsed)
 
+    def render_formula_body(
+        self,
+        atom_lookup: dict[str, str],
+        entity_expr: str = "{X}",
+    ) -> str:
+        return self._formula_to_body(atom_lookup=atom_lookup, entity_expr=entity_expr)
+
     def _formula_to_rule_from_atoms(
         self,
         atoms: list[ProblogAtom],

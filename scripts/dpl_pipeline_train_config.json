@@ -15,5 +15,10 @@
   "learning_rate": 0.0005,
   "batch_size": 64,
   "epochs": 50,
-  "device": "cuda"
+  "device": "cuda",
+  "problog_log_level": "ERROR",
+  "use_mlflow": true,
+  "mlflow_tracking_uri": null,
+  "mlflow_experiment_name": "deepproblog-dpl-pipeline",
+  "mlflow_run_name": null
 }

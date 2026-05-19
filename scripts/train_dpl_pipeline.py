@@ -11,12 +11,14 @@ import random
 import re
 import time
 from collections.abc import Mapping
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from hashlib import blake2b
 from itertools import product
 from pathlib import Path
 from typing import Any
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 import torch.nn as nn
@@ -57,6 +59,11 @@ class TrainingConfig:
     batch_size: int
     epochs: int
     device: str
+    problog_log_level: str
+    use_mlflow: bool
+    mlflow_tracking_uri: str | None
+    mlflow_experiment_name: str
+    mlflow_run_name: str | None
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "TrainingConfig":
@@ -80,22 +87,55 @@ class TrainingConfig:
             batch_size=int(raw.get("batch_size", 8)),
             epochs=int(raw.get("epochs", 20)),
             device=str(raw.get("device", "cuda")),
+            problog_log_level=str(raw.get("problog_log_level", "ERROR")),
+            use_mlflow=parse_bool(raw.get("use_mlflow", True)),
+            mlflow_tracking_uri=(
+                None
+                if raw.get("mlflow_tracking_uri") in (None, "")
+                else str(raw.get("mlflow_tracking_uri"))
+            ),
+            mlflow_experiment_name=str(
+                raw.get("mlflow_experiment_name", "deepproblog-dpl-pipeline")
+            ),
+            mlflow_run_name=(
+                None
+                if raw.get("mlflow_run_name") in (None, "")
+                else str(raw.get("mlflow_run_name"))
+            ),
         )
 
     def validate(self) -> None:
         total = self.train_fraction + self.val_fraction + self.test_fraction
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9):
-            raise ValueError("train_fraction + val_fraction + test_fraction must equal 1.0")
+            raise ValueError(
+                "train_fraction + val_fraction + test_fraction must equal 1.0"
+            )
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
         if self.epochs < 1:
             raise ValueError("epochs must be >= 1")
+        if not hasattr(logging, self.problog_log_level.upper()):
+            raise ValueError(
+                "problog_log_level must be a valid logging level name, such as ERROR or CRITICAL"
+            )
 
     def to_json_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["data_path"] = str(self.data_path)
         payload["output_dir"] = str(self.output_dir)
         return payload
+
+
+def parse_bool(value: object) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return bool(value)
 
 
 @dataclass(frozen=True)
@@ -191,7 +231,9 @@ class HashingTextTensorizer:
     def encode_segments(self, segments: tuple[str, ...]) -> torch.Tensor:
         token_ids = [self.cls_token_id]
         for segment in segments:
-            token_ids.extend(self._hash_token(token) for token in self._tokenize(segment))
+            token_ids.extend(
+                self._hash_token(token) for token in self._tokenize(segment)
+            )
             token_ids.append(self.sep_token_id)
 
         token_ids = token_ids[: self.max_length]
@@ -218,7 +260,9 @@ class HashingTextTensorizer:
 
 
 class AtomInputDataset(TorchDataset):
-    def __init__(self, atom_records: list[AtomRecord], tensorizer: HashingTextTensorizer):
+    def __init__(
+        self, atom_records: list[AtomRecord], tensorizer: HashingTextTensorizer
+    ):
         self.atom_records = list(atom_records)
         self.tensorizer = tensorizer
 
@@ -252,8 +296,8 @@ class QuerySubset(DeepProbLogDataset):
     def __getitem__(self, index: int) -> ExampleRow:
         return self.examples[self.indices[index]]
 
-    def to_query(self, index: int) -> Query:
-        example = self.examples[self.indices[index]]
+    def to_query(self, i: int) -> Query:
+        example = self.examples[self.indices[i]]
         return Query(
             Term(
                 self.predicate_name,
@@ -320,6 +364,14 @@ def load_training_config(path: Path) -> TrainingConfig:
     config = TrainingConfig.from_dict(raw)
     config.validate()
     return config
+
+
+def configure_library_logging(problog_log_level: str) -> None:
+    level_name = problog_log_level.upper()
+    level_value = getattr(logging, level_name)
+    for logger_name in ("problog", "deepproblog"):
+        library_logger = logging.getLogger(logger_name)
+        library_logger.setLevel(level_value)
 
 
 def load_examples(path: Path, limit: int | None = None) -> list[ExampleRow]:
@@ -660,7 +712,9 @@ def build_training_runtime(
     }
 
 
-def evaluate_query_dataset(model: Model, query_dataset: QuerySubset) -> dict[str, object]:
+def evaluate_query_dataset(
+    model: Model, query_dataset: QuerySubset
+) -> dict[str, object]:
     rows: list[dict[str, object]] = []
     absolute_errors: list[float] = []
     squared_errors: list[float] = []
@@ -707,13 +761,227 @@ def evaluate_query_dataset(model: Model, query_dataset: QuerySubset) -> dict[str
 
 def summarize_metrics(metrics: dict[str, object]) -> dict[str, float]:
     return {
-        key: round(float(value), 4)
+        key: round(float(value), 4) for key, value in metrics.items() if key != "rows"
+    }
+
+
+def flatten_metrics(prefix: str, metrics: dict[str, object]) -> dict[str, float]:
+    return {
+        f"{prefix}_{key}": float(value)
         for key, value in metrics.items()
         if key != "rows"
     }
 
 
-def train_model_from_config(config: TrainingConfig) -> dict[str, Any]:
+def import_mlflow() -> Any:
+    try:
+        import mlflow
+    except ImportError as exc:
+        raise RuntimeError(
+            "MLflow tracking is enabled, but the mlflow package is not available in the active environment"
+        ) from exc
+    return mlflow
+
+
+def configure_mlflow(config: TrainingConfig) -> Any | None:
+    if not config.use_mlflow:
+        return None
+    mlflow = import_mlflow()
+    if config.mlflow_tracking_uri:
+        mlflow.set_tracking_uri(config.mlflow_tracking_uri)
+    mlflow.set_experiment(config.mlflow_experiment_name)
+    return mlflow
+
+
+def log_mlflow_params(mlflow: Any, config: TrainingConfig) -> None:
+    mlflow.log_params(
+        {
+            key: ("null" if value is None else value)
+            for key, value in config.to_json_dict().items()
+        }
+    )
+    mlflow.set_tags(
+        {
+            "trainer": "train_dpl_pipeline",
+            "reasoner": "deepproblog",
+            "artifact_output_dir": str(config.output_dir),
+        }
+    )
+
+
+def log_mlflow_epoch_metrics(mlflow: Any, epoch_record: dict[str, float]) -> None:
+    epoch_step = int(epoch_record["epoch"])
+    metrics = {
+        key: float(value) for key, value in epoch_record.items() if key != "epoch"
+    }
+    mlflow.log_metrics(metrics, step=epoch_step)
+
+
+def build_mlflow_summary_metrics(result: dict[str, Any]) -> dict[str, float]:
+    summary_metrics: dict[str, float] = {}
+    for section in ("baseline", "final"):
+        section_metrics = result[section]
+        for split_name, split_metrics in section_metrics.items():
+            summary_metrics.update(
+                flatten_metrics(f"{section}_{split_name}", split_metrics)
+            )
+
+    summary_metrics["best_epoch"] = float(result["best"]["epoch"])
+    summary_metrics["best_validation_accuracy"] = float(
+        result["best"]["validation_accuracy"]
+    )
+    summary_metrics["split_train_count"] = float(len(result["train_indices"]))
+    summary_metrics["split_validation_count"] = float(len(result["val_indices"]))
+    summary_metrics["split_test_count"] = float(len(result["test_indices"]))
+    for split_name in ("train", "validation", "test"):
+        summary_metrics.update(
+            flatten_metrics(f"best_{split_name}", result["best"][split_name])
+        )
+
+    return summary_metrics
+
+
+def save_training_curves(
+    training_history: list[dict[str, float]],
+    baseline_validation_metrics: dict[str, object],
+    output_dir: Path,
+) -> dict[str, Path]:
+    history_frame = pd.DataFrame(training_history)
+    history_csv_path = output_dir / "training_history.csv"
+    history_frame.to_csv(history_csv_path, index=False)
+
+    epochs = history_frame["epoch"].astype(int).tolist()
+
+    loss_plot_path = output_dir / "loss_curves.png"
+    loss_figure, loss_axis = plt.subplots(figsize=(8, 4.5))
+    loss_axis.plot(
+        epochs,
+        history_frame["train_loss"],
+        marker="o",
+        linewidth=2,
+        label="Train batch loss",
+    )
+    loss_axis.plot(
+        epochs,
+        history_frame["train_query_loss"],
+        marker="s",
+        linewidth=2,
+        label="Train query loss",
+    )
+    loss_axis.plot(
+        epochs,
+        history_frame["val_loss"],
+        marker="^",
+        linewidth=2,
+        label="Validation query loss",
+    )
+    loss_axis.axhline(
+        float(baseline_validation_metrics["loss"]),
+        linestyle="--",
+        alpha=0.5,
+        color="#ff7f0e",
+        label="Baseline validation loss",
+    )
+    loss_axis.set_title("Training and Validation Loss")
+    loss_axis.set_xlabel("Epoch")
+    loss_axis.set_ylabel("Loss")
+    loss_axis.grid(alpha=0.3)
+    loss_axis.legend()
+    loss_figure.tight_layout()
+    loss_figure.savefig(loss_plot_path, dpi=160)
+    plt.close(loss_figure)
+
+    validation_plot_path = output_dir / "validation_metrics.png"
+    validation_figure, validation_axis = plt.subplots(figsize=(8, 4.5))
+    validation_axis.plot(
+        epochs,
+        history_frame["train_accuracy"],
+        marker="o",
+        linewidth=2,
+        label="Train accuracy",
+    )
+    validation_axis.plot(
+        epochs,
+        history_frame["val_accuracy"],
+        marker="s",
+        linewidth=2,
+        label="Validation accuracy",
+    )
+    validation_axis.plot(
+        epochs,
+        history_frame["val_mae"],
+        marker="^",
+        linewidth=2,
+        label="Validation MAE",
+    )
+    validation_axis.plot(
+        epochs,
+        history_frame["val_brier"],
+        marker="d",
+        linewidth=2,
+        label="Validation Brier",
+    )
+    validation_axis.axhline(
+        float(baseline_validation_metrics["accuracy"]),
+        linestyle="--",
+        alpha=0.5,
+        color="#1f77b4",
+        label="Baseline validation accuracy",
+    )
+    validation_axis.axhline(
+        float(baseline_validation_metrics["brier"]),
+        linestyle=":",
+        alpha=0.6,
+        color="#ff7f0e",
+        label="Baseline validation Brier",
+    )
+    validation_axis.set_title("Per-Epoch Validation Metrics")
+    validation_axis.set_xlabel("Epoch")
+    validation_axis.set_ylabel("Metric value")
+    validation_axis.grid(alpha=0.3)
+    validation_axis.legend()
+    validation_figure.tight_layout()
+    validation_figure.savefig(validation_plot_path, dpi=160)
+    plt.close(validation_figure)
+
+    return {
+        "training_history_csv": history_csv_path,
+        "loss_plot": loss_plot_path,
+        "validation_plot": validation_plot_path,
+    }
+
+
+def log_mlflow_artifacts(
+    mlflow: Any,
+    config: TrainingConfig,
+    result: dict[str, Any],
+    artifact_paths: dict[str, Path],
+) -> None:
+    mlflow.log_metrics(build_mlflow_summary_metrics(result))
+    mlflow.log_dict(
+        {"training_history": result["training_history"]},
+        "metrics/training_history.json",
+    )
+    mlflow.log_dict(config.to_json_dict(), "config/run_config.json")
+
+    for artifact_name, artifact_path in artifact_paths.items():
+        if artifact_name.endswith("_plot"):
+            artifact_subdir = "plots"
+        elif artifact_name.endswith("_csv"):
+            artifact_subdir = "tables"
+        else:
+            artifact_subdir = "outputs"
+        mlflow.log_artifact(str(artifact_path), artifact_path=artifact_subdir)
+
+    logger.info(
+        "Logged MLflow run artifacts to experiment '%s'", config.mlflow_experiment_name
+    )
+
+
+def train_model_from_config(
+    config: TrainingConfig,
+    mlflow: Any | None = None,
+) -> dict[str, Any]:
     random.seed(config.seed)
     torch.manual_seed(config.seed)
     torch.set_printoptions(edgeitems=3, linewidth=120)
@@ -738,7 +1006,9 @@ def train_model_from_config(config: TrainingConfig) -> dict[str, Any]:
         indices=train_indices + val_indices + test_indices,
         tensor_source_name=config.tensor_source_name,
     )
-    runtime = build_training_runtime(atom_records=atom_records, program=program, config=config)
+    runtime = build_training_runtime(
+        atom_records=atom_records, program=program, config=config
+    )
     scorer = runtime["scorer"]
     optimizer = runtime["optimizer"]
     model = runtime["model"]
@@ -774,11 +1044,14 @@ def train_model_from_config(config: TrainingConfig) -> dict[str, Any]:
         tuple(first_atom_batch["packed_input"].shape),
     )
     logger.info("Train batches per epoch: %d", len(query_train_loader))
-    logger.info("Baseline metrics: %s", {
-        "train": summarize_metrics(baseline_train_metrics),
-        "validation": summarize_metrics(baseline_val_metrics),
-        "test": summarize_metrics(baseline_test_metrics),
-    })
+    logger.info(
+        "Baseline metrics: %s",
+        {
+            "train": summarize_metrics(baseline_train_metrics),
+            "validation": summarize_metrics(baseline_val_metrics),
+            "test": summarize_metrics(baseline_test_metrics),
+        },
+    )
 
     train_object = TrainObject(model)
     loss_function = getattr(model.solver.semiring, "cross_entropy")
@@ -827,6 +1100,8 @@ def train_model_from_config(config: TrainingConfig) -> dict[str, Any]:
             best_epoch = epoch_index
             best_model_state = copy.deepcopy(scorer.state_dict())
             best_optimizer_state = copy.deepcopy(optimizer.state_dict())
+        if mlflow is not None:
+            log_mlflow_epoch_metrics(mlflow, epoch_record)
         logger.info(
             "Epoch %d/%d | train_loss=%.4f | val_loss=%.4f | val_mae=%.4f | val_accuracy=%.4f | seconds=%.1f",
             epoch_index,
@@ -888,6 +1163,11 @@ def save_artifacts(
     weights_path = output_dir / "atom_scorer_weights.pt"
     metrics_path = output_dir / "training_metrics.json"
     config_copy_path = output_dir / "config.json"
+    plot_paths = save_training_curves(
+        training_history=result["training_history"],
+        baseline_validation_metrics=result["baseline"]["validation"],
+        output_dir=output_dir,
+    )
 
     scorer = result["runtime"]["scorer"]
     optimizer = result["runtime"]["optimizer"]
@@ -955,6 +1235,7 @@ def save_artifacts(
         "weights": weights_path,
         "metrics": metrics_path,
         "config": config_copy_path,
+        **plot_paths,
     }
 
 
@@ -977,8 +1258,20 @@ def main() -> None:
     )
 
     config = load_training_config(args.config)
-    result = train_model_from_config(config)
-    artifact_paths = save_artifacts(config, result)
+    configure_library_logging(config.problog_log_level)
+    mlflow = configure_mlflow(config)
+    run_context = (
+        mlflow.start_run(run_name=config.mlflow_run_name)
+        if mlflow is not None
+        else nullcontext()
+    )
+    with run_context:
+        if mlflow is not None:
+            log_mlflow_params(mlflow, config)
+        result = train_model_from_config(config, mlflow=mlflow)
+        artifact_paths = save_artifacts(config, result)
+        if mlflow is not None:
+            log_mlflow_artifacts(mlflow, config, result, artifact_paths)
 
     logger.info("Saved checkpoint to %s", artifact_paths["checkpoint"])
     logger.info("Saved weights to %s", artifact_paths["weights"])

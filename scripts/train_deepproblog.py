@@ -60,7 +60,9 @@ def main() -> None:
 
     rows = read_deepproblog_rows(args.dataset_path, limit=args.limit)
     grouped_examples = group_deepproblog_rows(rows)
-    logger.info("Loaded %d rows grouped into %d queries", len(rows), len(grouped_examples))
+    logger.info(
+        "Loaded %d rows grouped into %d queries", len(rows), len(grouped_examples)
+    )
 
     model_config = DeepProbLogModelConfig(
         model_name=args.model_name,

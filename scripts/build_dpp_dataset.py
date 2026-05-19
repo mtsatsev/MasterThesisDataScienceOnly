@@ -20,7 +20,9 @@ def _read_jsonl(path: Path, limit: int | None = None) -> list[dict[str, Any]]:
     return rows
 
 
-def _load_documents(path: Path) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+def _load_documents(
+    path: Path,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     documents = _read_jsonl(path)
     by_title = {document["title"]: document for document in documents}
     return documents, by_title
@@ -172,7 +174,9 @@ def _append_random_negatives(
 
         target_count = len(positive_entities) * negatives_per_positive
         candidate_pool = [
-            document for document in documents if document["title"] not in positive_entities
+            document
+            for document in documents
+            if document["title"] not in positive_entities
         ]
         if not candidate_pool:
             continue

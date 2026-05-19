@@ -34,6 +34,7 @@ class EstimatorType(str, Enum):
     TRUE_FALSE_LLM = "TrueFalseLLM"
     LIKELIHOOD_BASED_PERPLEXITY = "Perplexity"
     LIKELIHOOD_BASED_CONTRASTIVE = "Contrastive"
+    DEEP_PROBLOG = "DeepProbLog"
 
 
 class LogicBackendType(str, Enum):
@@ -90,6 +91,10 @@ class EstimatorConfig(BaseModel):
         default=False,
         description="Include retrieved document text in Problog atom context",
     )
+    deepproblog_model_dir: Path | None = Field(
+        default=None,
+        description="Path to a trained DeepProbLog atom-classifier bundle",
+    )
     quantization: BitsAndBytesConfig = Field(
         default_factory=lambda: BitsAndBytesConfig(
             load_in_4bit=True,
@@ -131,6 +136,11 @@ class EstimatorConfig(BaseModel):
             if self.contrastive_temperature is None:
                 raise ValueError(
                     "contrastive_temperature is required for likelihood-based estimators"
+                )
+        if self.estimator_type == EstimatorType.DEEP_PROBLOG:
+            if self.deepproblog_model_dir is None:
+                raise ValueError(
+                    "deepproblog_model_dir is required for the DeepProbLog estimator"
                 )
         return self
 

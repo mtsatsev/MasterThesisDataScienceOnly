@@ -25,9 +25,9 @@ from llm_bayesian_reasoning.training.deepproblog_module import (
     AtomClassifier,
     DeepProbLogModelConfig,
     load_tokenizer,
+    run_deepproblog_training,
     save_model_bundle,
     train_atom_classifier,
-    run_deepproblog_training,
 )
 from scripts.run_pipeline import _load_preprocessed
 
@@ -42,7 +42,9 @@ def _make_smoke_dir(root: Path) -> Path:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Train and smoke-test DeepProbLog reranking")
+    parser = argparse.ArgumentParser(
+        description="Train and smoke-test DeepProbLog reranking"
+    )
     parser.add_argument(
         "--training-dataset",
         type=Path,
@@ -53,7 +55,9 @@ def main() -> None:
     parser.add_argument(
         "--pipeline-data-file",
         type=Path,
-        default=Path("llm_bayesian_reasoning/data/preprocessed_data/parsed_test_with_negs.jsonl"),
+        default=Path(
+            "llm_bayesian_reasoning/data/preprocessed_data/parsed_test_with_negs.jsonl"
+        ),
     )
     parser.add_argument(
         "--index-path",
@@ -90,7 +94,11 @@ def main() -> None:
 
     rows = read_deepproblog_rows(args.training_dataset, limit=args.training_limit)
     grouped_examples = group_deepproblog_rows(rows)
-    logger.info("Loaded %d training rows across %d grouped queries", len(rows), len(grouped_examples))
+    logger.info(
+        "Loaded %d training rows across %d grouped queries",
+        len(rows),
+        len(grouped_examples),
+    )
 
     model_config = DeepProbLogModelConfig(model_name=args.model_name)
     tokenizer = load_tokenizer(model_config.model_name)

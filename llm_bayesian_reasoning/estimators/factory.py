@@ -10,6 +10,9 @@ from transformers import (
 )
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
+from llm_bayesian_reasoning.estimators.deep_problog_estimator import (
+    DeepProbLogEstimator,
+)
 from llm_bayesian_reasoning.estimators.likelihood_based_estimator import (
     LikelihoodBasedEstimator,
 )
@@ -82,5 +85,11 @@ def create_estimator_from_config(estimator_config: EstimatorConfig) -> BaseEstim
 
     Supports True/False token estimator and likelihood-based estimators.
     """
+    if estimator_config.estimator_type == EstimatorType.DEEP_PROBLOG:
+        return DeepProbLogEstimator.from_model_bundle(
+            model_dir=estimator_config.deepproblog_model_dir,
+            device=estimator_config.device,
+        )
+
     model, tokenizer = load_model_and_tokenizer_from_config(estimator_config)
     return create_estimator_from_components(estimator_config, model, tokenizer)
