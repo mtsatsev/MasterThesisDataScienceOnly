@@ -11,7 +11,7 @@ import random
 import re
 import time
 from collections.abc import Mapping
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from hashlib import blake2b
 from itertools import product
@@ -75,7 +75,9 @@ class TrainingConfig:
             max_examples=(
                 None if raw.get("max_examples") is None else int(raw["max_examples"])
             ),
-            compute_baseline_metrics=parse_bool(raw.get("compute_baseline_metrics", True)),
+            compute_baseline_metrics=parse_bool(
+                raw.get("compute_baseline_metrics", True)
+            ),
             train_fraction=float(raw.get("train_fraction", 0.70)),
             val_fraction=float(raw.get("val_fraction", 0.15)),
             test_fraction=float(raw.get("test_fraction", 0.15)),
@@ -374,6 +376,18 @@ def configure_library_logging(problog_log_level: str) -> None:
     for logger_name in ("problog", "deepproblog"):
         library_logger = logging.getLogger(logger_name)
         library_logger.setLevel(level_value)
+
+
+@contextmanager
+def log_major_operation(message: str):
+    logger.info("%s", message)
+    started_at = time.perf_counter()
+    try:
+        yield
+    finally:
+        logger.info(
+            "Completed %s in %.2fs", message.lower(), time.perf_counter() - started_at
+        )
 
 
 def load_examples(path: Path, limit: int | None = None) -> list[ExampleRow]:
@@ -714,6 +728,23 @@ def build_training_runtime(
     }
 
 
+def count_model_parameters(module: nn.Module) -> tuple[int, int]:
+    total_parameters = sum(parameter.numel() for parameter in module.parameters())
+    trainable_parameters = sum(
+        parameter.numel()
+        for parameter in module.parameters()
+        if parameter.requires_grad
+    )
+    return total_parameters, trainable_parameters
+
+
+def get_module_device(module: nn.Module) -> str:
+    try:
+        return str(next(module.parameters()).device)
+    except StopIteration:
+        return "no-parameters"
+
+
 def evaluate_query_dataset(
     model: Model, query_dataset: QuerySubset
 ) -> dict[str, object]:
@@ -990,53 +1021,79 @@ def train_model_from_config(
     torch.manual_seed(config.seed)
     torch.set_printoptions(edgeitems=3, linewidth=120)
 
-    examples = load_examples(config.data_path, limit=config.max_examples)
-    train_indices, val_indices, test_indices = split_indices(
-        examples,
-        config.train_fraction,
-        config.val_fraction,
-        config.test_fraction,
-        config.seed,
-    )
-    atom_records, atom_records_by_example = build_atom_records(examples)
+    with log_major_operation(f"Loading examples from {config.data_path}"):
+        examples = load_examples(config.data_path, limit=config.max_examples)
 
-    query_train_dataset = QuerySubset(examples, train_indices)
-    query_val_dataset = QuerySubset(examples, val_indices)
-    query_test_dataset = QuerySubset(examples, test_indices)
+    with log_major_operation("Splitting examples into train/validation/test"):
+        train_indices, val_indices, test_indices = split_indices(
+            examples,
+            config.train_fraction,
+            config.val_fraction,
+            config.test_fraction,
+            config.seed,
+        )
 
-    program = compile_training_program(
-        examples=examples,
-        atom_records_by_example=atom_records_by_example,
-        indices=train_indices + val_indices + test_indices,
-        tensor_source_name=config.tensor_source_name,
-    )
-    runtime = build_training_runtime(
-        atom_records=atom_records, program=program, config=config
-    )
+    with log_major_operation("Expanding examples into atom records"):
+        atom_records, atom_records_by_example = build_atom_records(examples)
+
+    with log_major_operation("Creating query datasets"):
+        query_train_dataset = QuerySubset(examples, train_indices)
+        query_val_dataset = QuerySubset(examples, val_indices)
+        query_test_dataset = QuerySubset(examples, test_indices)
+
+    with log_major_operation("Compiling DeepProbLog training program"):
+        program = compile_training_program(
+            examples=examples,
+            atom_records_by_example=atom_records_by_example,
+            indices=train_indices + val_indices + test_indices,
+            tensor_source_name=config.tensor_source_name,
+        )
+
+    with log_major_operation("Building DeepProbLog runtime"):
+        runtime = build_training_runtime(
+            atom_records=atom_records, program=program, config=config
+        )
     scorer = runtime["scorer"]
     optimizer = runtime["optimizer"]
     model = runtime["model"]
+    total_parameters, trainable_parameters = count_model_parameters(scorer)
+    effective_device = get_module_device(scorer)
 
-    atom_input_dataset = AtomInputDataset(atom_records, runtime["tensorizer"])
-    atom_batch_loader = TorchDataLoader(
-        atom_input_dataset,
-        batch_size=config.batch_size,
-        shuffle=False,
-    )
-    first_atom_batch = next(iter(atom_batch_loader))
-    query_train_loader = DeepProbLogDataLoader(
-        query_train_dataset,
-        batch_size=config.batch_size,
-        shuffle=True,
-    )
+    with log_major_operation("Creating tensor and query data loaders"):
+        atom_input_dataset = AtomInputDataset(atom_records, runtime["tensorizer"])
+        atom_batch_loader = TorchDataLoader(
+            atom_input_dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+        )
+        first_atom_batch = next(iter(atom_batch_loader))
+        query_train_loader = DeepProbLogDataLoader(
+            query_train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+        )
 
     baseline_metrics: dict[str, dict[str, object]] = {}
     if config.compute_baseline_metrics:
-        baseline_metrics = {
-            "train": evaluate_query_dataset(model, query_train_dataset),
-            "validation": evaluate_query_dataset(model, query_val_dataset),
-            "test": evaluate_query_dataset(model, query_test_dataset),
-        }
+        logger.info("Starting baseline metric sweep")
+        baseline_metrics = {}
+        for split_name, dataset in (
+            ("train", query_train_dataset),
+            ("validation", query_val_dataset),
+            ("test", query_test_dataset),
+        ):
+            split_started_at = time.perf_counter()
+            logger.info(
+                "Evaluating baseline metrics on %s split (%d queries)",
+                split_name,
+                len(dataset),
+            )
+            baseline_metrics[split_name] = evaluate_query_dataset(model, dataset)
+            logger.info(
+                "Finished baseline %s evaluation in %.2fs",
+                split_name,
+                time.perf_counter() - split_started_at,
+            )
 
     logger.info("Loaded examples after cleaning: %d", len(examples))
     logger.info("Expanded atom records: %d", len(atom_records))
@@ -1047,6 +1104,17 @@ def train_model_from_config(
         len(test_indices),
     )
     logger.info("Program lines: %d", len(program.splitlines()))
+    logger.info(
+        "Model parameters: total=%d trainable=%d",
+        total_parameters,
+        trainable_parameters,
+    )
+    logger.info(
+        "Device configuration: requested=%s effective_model_device=%s cuda_available=%s",
+        config.device,
+        effective_device,
+        torch.cuda.is_available(),
+    )
     logger.info(
         "Atom batch tensor shape: %s",
         tuple(first_atom_batch["packed_input"].shape),
@@ -1073,10 +1141,12 @@ def train_model_from_config(
 
     for epoch_index in range(1, config.epochs + 1):
         epoch_start = time.perf_counter()
+        logger.info("Starting epoch %d/%d", epoch_index, config.epochs)
         train_object.model.optimizer.step_epoch()
         train_object.timing = [0.0, 0.0, 0.0]
         epoch_loss_total = 0.0
 
+        batch_training_start = time.perf_counter()
         for batch in query_train_loader:
             train_object.i += 1
             train_object.model.train()
@@ -1084,9 +1154,15 @@ def train_model_from_config(
             batch_loss = train_object.get_loss(batch, loss_function)
             epoch_loss_total += as_float(batch_loss)
             train_object.model.optimizer.step()
+        batch_training_duration = time.perf_counter() - batch_training_start
 
+        train_eval_start = time.perf_counter()
         train_metrics = evaluate_query_dataset(model, query_train_dataset)
+        train_eval_duration = time.perf_counter() - train_eval_start
+
+        val_eval_start = time.perf_counter()
         val_metrics = evaluate_query_dataset(model, query_val_dataset)
+        val_eval_duration = time.perf_counter() - val_eval_start
         epoch_duration = time.perf_counter() - epoch_start
 
         epoch_record = {
@@ -1103,6 +1179,9 @@ def train_model_from_config(
             "ground_time": float(train_object.timing[0]),
             "compile_time": float(train_object.timing[1]),
             "eval_time": float(train_object.timing[2]),
+            "batch_training_seconds": batch_training_duration,
+            "train_eval_seconds": train_eval_duration,
+            "val_eval_seconds": val_eval_duration,
         }
         training_history.append(epoch_record)
         if epoch_record["val_accuracy"] > best_val_accuracy:
@@ -1113,7 +1192,7 @@ def train_model_from_config(
         if mlflow is not None:
             log_mlflow_epoch_metrics(mlflow, epoch_record)
         logger.info(
-            "Epoch %d/%d | train_loss=%.4f | val_loss=%.4f | val_mae=%.4f | val_accuracy=%.4f | seconds=%.1f",
+            "Epoch %d/%d | train_loss=%.4f | val_loss=%.4f | val_mae=%.4f | val_accuracy=%.4f | epoch_seconds=%.1f | batch_train=%.1fs | train_eval=%.1fs | val_eval=%.1fs",
             epoch_index,
             config.epochs,
             epoch_record["train_loss"],
@@ -1121,18 +1200,34 @@ def train_model_from_config(
             epoch_record["val_mae"],
             epoch_record["val_accuracy"],
             epoch_record["duration_seconds"],
+            epoch_record["batch_training_seconds"],
+            epoch_record["train_eval_seconds"],
+            epoch_record["val_eval_seconds"],
         )
 
+    logger.info("Evaluating final metrics with last-epoch weights")
+    final_metrics_start = time.perf_counter()
     final_train_metrics = evaluate_query_dataset(model, query_train_dataset)
     final_val_metrics = evaluate_query_dataset(model, query_val_dataset)
     final_test_metrics = evaluate_query_dataset(model, query_test_dataset)
+    logger.info(
+        "Finished final metric evaluation in %.2fs",
+        time.perf_counter() - final_metrics_start,
+    )
 
+    logger.info("Restoring best checkpoint from epoch %d", best_epoch)
     scorer.load_state_dict(best_model_state)
     optimizer.load_state_dict(best_optimizer_state)
 
+    logger.info("Evaluating metrics with best checkpoint weights")
+    best_metrics_start = time.perf_counter()
     best_train_metrics = evaluate_query_dataset(model, query_train_dataset)
     best_val_metrics = evaluate_query_dataset(model, query_val_dataset)
     best_test_metrics = evaluate_query_dataset(model, query_test_dataset)
+    logger.info(
+        "Finished best-checkpoint metric evaluation in %.2fs",
+        time.perf_counter() - best_metrics_start,
+    )
 
     return {
         "examples": examples,
@@ -1268,11 +1363,14 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    config = load_training_config(args.config)
+    with log_major_operation(f"Loading training config from {args.config}"):
+        config = load_training_config(args.config)
     if args.skip_baseline:
         config.compute_baseline_metrics = False
-    configure_library_logging(config.problog_log_level)
-    mlflow = configure_mlflow(config)
+    with log_major_operation("Configuring library logging"):
+        configure_library_logging(config.problog_log_level)
+    with log_major_operation("Configuring MLflow"):
+        mlflow = configure_mlflow(config)
     run_context = (
         mlflow.start_run(run_name=config.mlflow_run_name)
         if mlflow is not None
@@ -1280,11 +1378,15 @@ def main() -> None:
     )
     with run_context:
         if mlflow is not None:
-            log_mlflow_params(mlflow, config)
-        result = train_model_from_config(config, mlflow=mlflow)
-        artifact_paths = save_artifacts(config, result)
+            with log_major_operation("Logging MLflow run parameters"):
+                log_mlflow_params(mlflow, config)
+        with log_major_operation("Training DeepProbLog pipeline"):
+            result = train_model_from_config(config, mlflow=mlflow)
+        with log_major_operation(f"Saving artifacts to {config.output_dir}"):
+            artifact_paths = save_artifacts(config, result)
         if mlflow is not None:
-            log_mlflow_artifacts(mlflow, config, result, artifact_paths)
+            with log_major_operation("Logging MLflow artifacts"):
+                log_mlflow_artifacts(mlflow, config, result, artifact_paths)
 
     logger.info("Saved checkpoint to %s", artifact_paths["checkpoint"])
     logger.info("Saved weights to %s", artifact_paths["weights"])
