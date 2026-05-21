@@ -3,6 +3,7 @@
   "data_path": "llm_bayesian_reasoning/data/preprocessed_data/dpppl.jsonl",
   "output_dir": "llm_bayesian_reasoning/snapshot/dpl_pipeline_run",
   "max_examples": null,
+  "compute_baseline_metrics": false,
   "train_fraction": 0.7,
   "val_fraction": 0.15,
   "test_fraction": 0.15,

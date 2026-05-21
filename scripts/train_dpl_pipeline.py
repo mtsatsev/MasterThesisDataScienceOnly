@@ -46,6 +46,7 @@ class TrainingConfig:
     data_path: Path
     output_dir: Path
     max_examples: int | None
+    compute_baseline_metrics: bool
     train_fraction: float
     val_fraction: float
     test_fraction: float
@@ -74,6 +75,7 @@ class TrainingConfig:
             max_examples=(
                 None if raw.get("max_examples") is None else int(raw["max_examples"])
             ),
+            compute_baseline_metrics=parse_bool(raw.get("compute_baseline_metrics", True)),
             train_fraction=float(raw.get("train_fraction", 0.70)),
             val_fraction=float(raw.get("val_fraction", 0.15)),
             test_fraction=float(raw.get("test_fraction", 0.15)),
@@ -820,7 +822,7 @@ def log_mlflow_epoch_metrics(mlflow: Any, epoch_record: dict[str, float]) -> Non
 def build_mlflow_summary_metrics(result: dict[str, Any]) -> dict[str, float]:
     summary_metrics: dict[str, float] = {}
     for section in ("baseline", "final"):
-        section_metrics = result[section]
+        section_metrics = result.get(section) or {}
         for split_name, split_metrics in section_metrics.items():
             summary_metrics.update(
                 flatten_metrics(f"{section}_{split_name}", split_metrics)
@@ -843,7 +845,7 @@ def build_mlflow_summary_metrics(result: dict[str, Any]) -> dict[str, float]:
 
 def save_training_curves(
     training_history: list[dict[str, float]],
-    baseline_validation_metrics: dict[str, object],
+    baseline_validation_metrics: dict[str, object] | None,
     output_dir: Path,
 ) -> dict[str, Path]:
     history_frame = pd.DataFrame(training_history)
@@ -875,13 +877,14 @@ def save_training_curves(
         linewidth=2,
         label="Validation query loss",
     )
-    loss_axis.axhline(
-        float(baseline_validation_metrics["loss"]),
-        linestyle="--",
-        alpha=0.5,
-        color="#ff7f0e",
-        label="Baseline validation loss",
-    )
+    if baseline_validation_metrics is not None:
+        loss_axis.axhline(
+            float(baseline_validation_metrics["loss"]),
+            linestyle="--",
+            alpha=0.5,
+            color="#ff7f0e",
+            label="Baseline validation loss",
+        )
     loss_axis.set_title("Training and Validation Loss")
     loss_axis.set_xlabel("Epoch")
     loss_axis.set_ylabel("Loss")
@@ -921,20 +924,21 @@ def save_training_curves(
         linewidth=2,
         label="Validation Brier",
     )
-    validation_axis.axhline(
-        float(baseline_validation_metrics["accuracy"]),
-        linestyle="--",
-        alpha=0.5,
-        color="#1f77b4",
-        label="Baseline validation accuracy",
-    )
-    validation_axis.axhline(
-        float(baseline_validation_metrics["brier"]),
-        linestyle=":",
-        alpha=0.6,
-        color="#ff7f0e",
-        label="Baseline validation Brier",
-    )
+    if baseline_validation_metrics is not None:
+        validation_axis.axhline(
+            float(baseline_validation_metrics["accuracy"]),
+            linestyle="--",
+            alpha=0.5,
+            color="#1f77b4",
+            label="Baseline validation accuracy",
+        )
+        validation_axis.axhline(
+            float(baseline_validation_metrics["brier"]),
+            linestyle=":",
+            alpha=0.6,
+            color="#ff7f0e",
+            label="Baseline validation Brier",
+        )
     validation_axis.set_title("Per-Epoch Validation Metrics")
     validation_axis.set_xlabel("Epoch")
     validation_axis.set_ylabel("Metric value")
@@ -1026,9 +1030,13 @@ def train_model_from_config(
         shuffle=True,
     )
 
-    baseline_train_metrics = evaluate_query_dataset(model, query_train_dataset)
-    baseline_val_metrics = evaluate_query_dataset(model, query_val_dataset)
-    baseline_test_metrics = evaluate_query_dataset(model, query_test_dataset)
+    baseline_metrics: dict[str, dict[str, object]] = {}
+    if config.compute_baseline_metrics:
+        baseline_metrics = {
+            "train": evaluate_query_dataset(model, query_train_dataset),
+            "validation": evaluate_query_dataset(model, query_val_dataset),
+            "test": evaluate_query_dataset(model, query_test_dataset),
+        }
 
     logger.info("Loaded examples after cleaning: %d", len(examples))
     logger.info("Expanded atom records: %d", len(atom_records))
@@ -1044,14 +1052,16 @@ def train_model_from_config(
         tuple(first_atom_batch["packed_input"].shape),
     )
     logger.info("Train batches per epoch: %d", len(query_train_loader))
-    logger.info(
-        "Baseline metrics: %s",
-        {
-            "train": summarize_metrics(baseline_train_metrics),
-            "validation": summarize_metrics(baseline_val_metrics),
-            "test": summarize_metrics(baseline_test_metrics),
-        },
-    )
+    if baseline_metrics:
+        logger.info(
+            "Baseline metrics: %s",
+            {
+                split: summarize_metrics(metrics)
+                for split, metrics in baseline_metrics.items()
+            },
+        )
+    else:
+        logger.info("Baseline metric pass skipped")
 
     train_object = TrainObject(model)
     loss_function = getattr(model.solver.semiring, "cross_entropy")
@@ -1132,11 +1142,7 @@ def train_model_from_config(
         "program": program,
         "runtime": runtime,
         "training_history": training_history,
-        "baseline": {
-            "train": baseline_train_metrics,
-            "validation": baseline_val_metrics,
-            "test": baseline_test_metrics,
-        },
+        "baseline": baseline_metrics,
         "final": {
             "train": final_train_metrics,
             "validation": final_val_metrics,
@@ -1165,7 +1171,7 @@ def save_artifacts(
     config_copy_path = output_dir / "config.json"
     plot_paths = save_training_curves(
         training_history=result["training_history"],
-        baseline_validation_metrics=result["baseline"]["validation"],
+        baseline_validation_metrics=result["baseline"].get("validation"),
         output_dir=output_dir,
     )
 
@@ -1249,6 +1255,11 @@ def main() -> None:
         default=Path("scripts/dpl_pipeline_train_config.json"),
         help="JSON config path",
     )
+    parser.add_argument(
+        "--skip-baseline",
+        action="store_true",
+        help="Skip the pre-training baseline metric sweep over train/validation/test",
+    )
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
 
@@ -1258,6 +1269,8 @@ def main() -> None:
     )
 
     config = load_training_config(args.config)
+    if args.skip_baseline:
+        config.compute_baseline_metrics = False
     configure_library_logging(config.problog_log_level)
     mlflow = configure_mlflow(config)
     run_context = (
