@@ -12,7 +12,7 @@ import re
 import time
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from hashlib import blake2b
 from itertools import product
 from pathlib import Path
@@ -390,13 +390,10 @@ def log_major_operation(message: str):
         )
 
 
-def load_examples(path: Path, limit: int | None = None) -> list[ExampleRow]:
+def load_examples(path: Path) -> list[ExampleRow]:
     examples: list[ExampleRow] = []
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
-            if limit is not None and len(examples) >= limit:
-                break
-
             raw = json.loads(line)
             atoms = tuple(
                 collapse_whitespace(atom)
@@ -437,6 +434,49 @@ def load_examples(path: Path, limit: int | None = None) -> list[ExampleRow]:
         raise ValueError("No usable examples were loaded from the JSONL file")
 
     return examples
+
+
+def select_example_subset(
+    examples: list[ExampleRow],
+    limit: int | None,
+    seed: int,
+) -> list[ExampleRow]:
+    if limit is None or limit >= len(examples):
+        return examples
+    if limit < 1:
+        raise ValueError("max_examples must be >= 1 when provided")
+
+    split_frame = pd.DataFrame(
+        {
+            "index": list(range(len(examples))),
+            "target": [example.relevance for example in examples],
+        }
+    )
+
+    try:
+        subset_frame, _ = train_test_split(
+            split_frame,
+            train_size=limit,
+            random_state=seed,
+            shuffle=True,
+            stratify=split_frame["target"],
+        )
+    except ValueError as exc:
+        logger.warning(
+            "Falling back to unstratified max_examples sampling for %d examples: %s",
+            limit,
+            exc,
+        )
+        subset_frame, _ = train_test_split(
+            split_frame,
+            train_size=limit,
+            random_state=seed,
+            shuffle=True,
+            stratify=None,
+        )
+
+    selected_examples = [examples[int(index)] for index in subset_frame["index"].tolist()]
+    return [replace(example, example_id=new_id) for new_id, example in enumerate(selected_examples)]
 
 
 def split_indices(
@@ -898,6 +938,18 @@ def build_mlflow_summary_metrics(result: dict[str, Any]) -> dict[str, float]:
     return summary_metrics
 
 
+def allocate_run_output_dir(base_output_dir: Path) -> Path:
+    base_output_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    candidate = base_output_dir / timestamp
+    suffix = 1
+    while candidate.exists():
+        candidate = base_output_dir / f"{timestamp}_{suffix:02d}"
+        suffix += 1
+    candidate.mkdir(parents=True, exist_ok=False)
+    return candidate
+
+
 def save_training_curves(
     training_history: list[dict[str, float]],
     baseline_validation_metrics: dict[str, object] | None,
@@ -1046,7 +1098,8 @@ def train_model_from_config(
     torch.set_printoptions(edgeitems=3, linewidth=120)
 
     with log_major_operation(f"Loading examples from {config.data_path}"):
-        examples = load_examples(config.data_path, limit=config.max_examples)
+        examples = load_examples(config.data_path)
+        examples = select_example_subset(examples, config.max_examples, config.seed)
 
     with log_major_operation("Splitting examples into train/validation/test"):
         train_indices, val_indices, test_indices = split_indices(
@@ -1281,8 +1334,8 @@ def save_artifacts(
     config: TrainingConfig,
     result: dict[str, Any],
 ) -> dict[str, Path]:
-    output_dir = config.output_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = allocate_run_output_dir(config.output_dir)
+    logger.info("Saving run artifacts under %s", output_dir)
 
     checkpoint_path = output_dir / "training_checkpoint.pt"
     weights_path = output_dir / "atom_scorer_weights.pt"
@@ -1310,6 +1363,7 @@ def save_artifacts(
 
     metrics_payload = {
         "config": config.to_json_dict(),
+        "artifact_output_dir": str(output_dir),
         "selected_checkpoint": {
             "epoch": result["best"]["epoch"],
             "validation_accuracy": result["best"]["validation_accuracy"],
