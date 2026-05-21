@@ -13,6 +13,9 @@ from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.deep_problog_estimator import (
     DeepProbLogEstimator,
 )
+from llm_bayesian_reasoning.estimators.dpl_pipeline_estimator import (
+    DPLPipelineEstimator,
+)
 from llm_bayesian_reasoning.estimators.likelihood_based_estimator import (
     LikelihoodBasedEstimator,
 )
@@ -88,6 +91,12 @@ def create_estimator_from_config(estimator_config: EstimatorConfig) -> BaseEstim
     if estimator_config.estimator_type == EstimatorType.DEEP_PROBLOG:
         return DeepProbLogEstimator.from_model_bundle(
             model_dir=estimator_config.deepproblog_model_dir,
+            device=estimator_config.device,
+        )
+
+    if estimator_config.estimator_type == EstimatorType.DPL_PIPELINE:
+        return DPLPipelineEstimator.from_model_bundle(
+            model_dir=estimator_config.dpl_pipeline_model_dir,
             device=estimator_config.device,
         )
 

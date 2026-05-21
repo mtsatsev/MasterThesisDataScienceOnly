@@ -1341,6 +1341,8 @@ def save_artifacts(
     weights_path = output_dir / "atom_scorer_weights.pt"
     metrics_path = output_dir / "training_metrics.json"
     config_copy_path = output_dir / "config.json"
+    program_path = output_dir / "training_program.pl"
+    bundle_manifest_path = output_dir / "dpl_pipeline_bundle.json"
     plot_paths = save_training_curves(
         training_history=result["training_history"],
         baseline_validation_metrics=result["baseline"].get("validation"),
@@ -1408,12 +1410,32 @@ def save_artifacts(
         json.dumps(config.to_json_dict(), indent=2),
         encoding="utf-8",
     )
+    program_path.write_text(result["program"], encoding="utf-8")
+    bundle_manifest_path.write_text(
+        json.dumps(
+            {
+                "artifact_type": "dpl_pipeline_bundle",
+                "estimator_type": "DPLPipeline",
+                "config_path": str(config_copy_path),
+                "weights_path": str(weights_path),
+                "checkpoint_path": str(checkpoint_path),
+                "program_path": str(program_path),
+                "metrics_path": str(metrics_path),
+                "best_epoch": result["best"]["epoch"],
+                "best_validation_accuracy": result["best"]["validation_accuracy"],
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     return {
         "checkpoint": checkpoint_path,
         "weights": weights_path,
         "metrics": metrics_path,
         "config": config_copy_path,
+        "program": program_path,
+        "bundle_manifest": bundle_manifest_path,
         **plot_paths,
     }
 

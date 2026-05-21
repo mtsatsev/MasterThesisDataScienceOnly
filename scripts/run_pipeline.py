@@ -38,8 +38,8 @@ def _normalize_placeholder(value: str) -> str:
     return value.replace("{x}", "{X}")
 
 
-def _build_atom(atom: str) -> ProblogAtom:
-    return ProblogAtom(atom=_normalize_placeholder(atom))
+def _build_atom(atom: str, context: str | None = None) -> ProblogAtom:
+    return ProblogAtom(atom=_normalize_placeholder(atom), context=context)
 
 
 def _load_preprocessed(
@@ -76,6 +76,11 @@ def _load_preprocessed(
             logical = parsed.get("logical query") or parsed.get("logical_query") or ""
 
             atoms_text = [atom for atom in atoms_raw if isinstance(atom, str)]
+            query_context = (
+                f"Query: {query}"
+                if estimator_type == EstimatorType.DPL_PIPELINE and query
+                else None
+            )
             atoms_objs: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]
             if estimator_type == EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE:
                 negated_atoms_text = [
@@ -92,11 +97,16 @@ def _load_preprocessed(
                         f"{len(negated_atoms_text)} negated_atoms"
                     )
                 atoms_objs = [
-                    (_build_atom(atom), _build_atom(negated_atom))
+                    (
+                        _build_atom(atom, context=query_context),
+                        _build_atom(negated_atom, context=query_context),
+                    )
                     for atom, negated_atom in zip(atoms_text, negated_atoms_text)
                 ]
             else:
-                atoms_objs = [_build_atom(atom) for atom in atoms_text]
+                atoms_objs = [
+                    _build_atom(atom, context=query_context) for atom in atoms_text
+                ]
 
             formula = ProblogFormula(formula=_normalize_placeholder(logical))
 
@@ -133,6 +143,14 @@ def _make_results_folder(
     return out
 
 
+def _estimator_run_name(estimator_cfg: EstimatorConfig) -> str:
+    if estimator_cfg.estimator_type == EstimatorType.DEEP_PROBLOG:
+        return Path(str(estimator_cfg.deepproblog_model_dir)).name
+    if estimator_cfg.estimator_type == EstimatorType.DPL_PIPELINE:
+        return Path(str(estimator_cfg.dpl_pipeline_model_dir)).name
+    return estimator_cfg.model_name
+
+
 def main():
     p = argparse.ArgumentParser(
         description="Run retrieval + ProbLog scoring pipeline (cloud-friendly CLI)"
@@ -167,6 +185,12 @@ def main():
         type=Path,
         default=None,
         help="Path to a trained DeepProbLog model bundle for estimator-type DeepProbLog",
+    )
+    p.add_argument(
+        "--dpl-pipeline-model-dir",
+        type=Path,
+        default=None,
+        help="Path to a trained DPL pipeline run directory for estimator-type DPLPipeline",
     )
     p.add_argument(
         "--estimator-type",
@@ -241,6 +265,7 @@ def main():
             estimator_type=EstimatorType(args.estimator_type),
             include_retrieved_text=args.include_retrieved_text,
             deepproblog_model_dir=args.deepproblog_model_dir,
+            dpl_pipeline_model_dir=args.dpl_pipeline_model_dir,
         )
     else:
         estimator_cfg = EstimatorConfig(
@@ -248,6 +273,7 @@ def main():
             device=args.device,
             include_retrieved_text=args.include_retrieved_text,
             deepproblog_model_dir=args.deepproblog_model_dir,
+            dpl_pipeline_model_dir=args.dpl_pipeline_model_dir,
         )
 
     # Create a temporary PipelineConfig to determine run naming
@@ -267,7 +293,7 @@ def main():
     try:
         results_dir = _make_results_folder(
             results_root,
-            estimator_cfg.model_name,
+            _estimator_run_name(estimator_cfg),
             pipe_cfg.retriever_type,
             estimator_cfg.estimator_type,
             pipe_cfg.logic_backend,
@@ -301,6 +327,11 @@ def main():
                 "deepproblog_model_dir": (
                     str(estimator_cfg.deepproblog_model_dir)
                     if estimator_cfg.deepproblog_model_dir is not None
+                    else None
+                ),
+                "dpl_pipeline_model_dir": (
+                    str(estimator_cfg.dpl_pipeline_model_dir)
+                    if estimator_cfg.dpl_pipeline_model_dir is not None
                     else None
                 ),
                 "mlflow_experiment": args.mlflow_experiment,

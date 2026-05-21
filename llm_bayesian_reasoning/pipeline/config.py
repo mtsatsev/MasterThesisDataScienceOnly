@@ -35,6 +35,7 @@ class EstimatorType(str, Enum):
     LIKELIHOOD_BASED_PERPLEXITY = "Perplexity"
     LIKELIHOOD_BASED_CONTRASTIVE = "Contrastive"
     DEEP_PROBLOG = "DeepProbLog"
+    DPL_PIPELINE = "DPLPipeline"
 
 
 class LogicBackendType(str, Enum):
@@ -95,6 +96,10 @@ class EstimatorConfig(BaseModel):
         default=None,
         description="Path to a trained DeepProbLog atom-classifier bundle",
     )
+    dpl_pipeline_model_dir: Path | None = Field(
+        default=None,
+        description="Path to a trained DPL pipeline run directory",
+    )
     quantization: BitsAndBytesConfig = Field(
         default_factory=lambda: BitsAndBytesConfig(
             load_in_4bit=True,
@@ -141,6 +146,11 @@ class EstimatorConfig(BaseModel):
             if self.deepproblog_model_dir is None:
                 raise ValueError(
                     "deepproblog_model_dir is required for the DeepProbLog estimator"
+                )
+        if self.estimator_type == EstimatorType.DPL_PIPELINE:
+            if self.dpl_pipeline_model_dir is None:
+                raise ValueError(
+                    "dpl_pipeline_model_dir is required for the DPLPipeline estimator"
                 )
         return self
 
