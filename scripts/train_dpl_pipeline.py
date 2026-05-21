@@ -701,23 +701,47 @@ def build_training_runtime(
     program: str,
     config: TrainingConfig,
 ) -> dict[str, object]:
-    tensorizer = HashingTextTensorizer(
-        vocab_size=config.vocab_size,
-        max_length=config.max_length,
-    )
-    tensor_source = tensorizer.build_tensor_source(atom_records)
-    scorer = TransformerAtomScorer.from_random_distilbert(
-        vocab_size=tensorizer.vocab_size,
-        max_length=tensorizer.max_length,
-        hidden_size=config.hidden_size,
-        n_layers=config.n_layers,
-        n_heads=config.n_heads,
-    )
-    optimizer = torch.optim.Adam(scorer.parameters(), lr=config.learning_rate)
-    network = Network(scorer, "atom_classifier", optimizer=optimizer, batching=True)
-    model = Model(program, [network], load=False)
-    model.add_tensor_source(config.tensor_source_name, tensor_source)
-    model.set_engine(ExactEngine(model))
+    with log_major_operation(
+        f"Initializing tensorizer (vocab_size={config.vocab_size}, max_length={config.max_length})"
+    ):
+        tensorizer = HashingTextTensorizer(
+            vocab_size=config.vocab_size,
+            max_length=config.max_length,
+        )
+
+    with log_major_operation(
+        f"Encoding {len(atom_records)} atom records into tensors"
+    ):
+        tensor_source = tensorizer.build_tensor_source(atom_records)
+
+    with log_major_operation(
+        "Initializing transformer atom scorer"
+    ):
+        scorer = TransformerAtomScorer.from_random_distilbert(
+            vocab_size=tensorizer.vocab_size,
+            max_length=tensorizer.max_length,
+            hidden_size=config.hidden_size,
+            n_layers=config.n_layers,
+            n_heads=config.n_heads,
+        )
+
+    with log_major_operation("Creating optimizer and DeepProbLog network wrapper"):
+        optimizer = torch.optim.Adam(scorer.parameters(), lr=config.learning_rate)
+        network = Network(
+            scorer, "atom_classifier", optimizer=optimizer, batching=True
+        )
+
+    with log_major_operation("Constructing DeepProbLog model from compiled program"):
+        model = Model(program, [network], load=False)
+
+    with log_major_operation(
+        f"Registering tensor source '{config.tensor_source_name}'"
+    ):
+        model.add_tensor_source(config.tensor_source_name, tensor_source)
+
+    with log_major_operation("Attaching ExactEngine to DeepProbLog model"):
+        model.set_engine(ExactEngine(model))
+
     return {
         "tensorizer": tensorizer,
         "tensor_source": tensor_source,
