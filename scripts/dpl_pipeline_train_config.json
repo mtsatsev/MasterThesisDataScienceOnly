@@ -8,7 +8,7 @@
   "val_fraction": 0.15,
   "test_fraction": 0.15,
   "tensor_source_name": "atom_inputs",
-  "max_length": 2048,
+  "max_length": 512,
   "vocab_size": 32768,
   "hidden_size": 64,
   "n_layers": 6,
