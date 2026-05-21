@@ -1,0 +1,31 @@
+{
+  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test_with_negs.jsonl",
+  "results_root": "llm_bayesian_reasoning/results",
+  "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
+  "use_metadata_ground_truth": true,
+  "retrievers": [
+    {
+      "name": "bm25-main",
+      "retriever_type": "BM25",
+      "index_path": "index/bm25",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "batch_size": 1000,
+      "retrieval_pool_size": 50
+    }
+  ],
+  "variants": [
+    {
+      "name": "small_problog_dpl_pipeline_smoke",
+      "retriever_name": "bm25-main",
+      "top_n": 10,
+      "top_k": 5,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "estimator_type": "DPLPipeline",
+        "device": "cuda",
+        "include_retrieved_text": true,
+        "dpl_pipeline_model_dir": "llm_bayesian_reasoning/snapshot/dpl_pipeline_run/REPLACE_WITH_TRAIN_RUN_DIR"
+      }
+    }
+  ]
+}
