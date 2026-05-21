@@ -475,8 +475,13 @@ def select_example_subset(
             stratify=None,
         )
 
-    selected_examples = [examples[int(index)] for index in subset_frame["index"].tolist()]
-    return [replace(example, example_id=new_id) for new_id, example in enumerate(selected_examples)]
+    selected_examples = [
+        examples[int(index)] for index in subset_frame["index"].tolist()
+    ]
+    return [
+        replace(example, example_id=new_id)
+        for new_id, example in enumerate(selected_examples)
+    ]
 
 
 def split_indices(
@@ -749,14 +754,10 @@ def build_training_runtime(
             max_length=config.max_length,
         )
 
-    with log_major_operation(
-        f"Encoding {len(atom_records)} atom records into tensors"
-    ):
+    with log_major_operation(f"Encoding {len(atom_records)} atom records into tensors"):
         tensor_source = tensorizer.build_tensor_source(atom_records)
 
-    with log_major_operation(
-        "Initializing transformer atom scorer"
-    ):
+    with log_major_operation("Initializing transformer atom scorer"):
         scorer = TransformerAtomScorer.from_random_distilbert(
             vocab_size=tensorizer.vocab_size,
             max_length=tensorizer.max_length,
@@ -767,9 +768,7 @@ def build_training_runtime(
 
     with log_major_operation("Creating optimizer and DeepProbLog network wrapper"):
         optimizer = torch.optim.Adam(scorer.parameters(), lr=config.learning_rate)
-        network = Network(
-            scorer, "atom_classifier", optimizer=optimizer, batching=True
-        )
+        network = Network(scorer, "atom_classifier", optimizer=optimizer, batching=True)
 
     with log_major_operation("Constructing DeepProbLog model from compiled program"):
         model = Model(program, [network], load=False)

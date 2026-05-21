@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from llm_bayesian_reasoning.estimators.factory import (
-    create_estimator_from_config,
     create_estimator_from_components,
+    create_estimator_from_config,
     load_model_and_tokenizer_from_config,
 )
 from llm_bayesian_reasoning.pipeline.config import (
@@ -125,11 +125,15 @@ def _build_variant_atoms(
     if estimator_type == EstimatorType.DPL_PIPELINE:
         query_context = f"Query: {record['query']}" if record["query"] else None
         positive_atoms = [
-            ProblogAtom(atom=atom.atom, probability=atom.probability, context=query_context)
+            ProblogAtom(
+                atom=atom.atom, probability=atom.probability, context=query_context
+            )
             for atom in positive_atoms
         ]
         negated_atoms = [
-            ProblogAtom(atom=atom.atom, probability=atom.probability, context=query_context)
+            ProblogAtom(
+                atom=atom.atom, probability=atom.probability, context=query_context
+            )
             for atom in negated_atoms
         ]
 
