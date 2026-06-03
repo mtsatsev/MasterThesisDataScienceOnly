@@ -124,7 +124,7 @@ def main() -> None:
     parser.add_argument(
         "--stage2-queries",
         type=int,
-        default=5000,
+        default=None,
         help="Number of grouped queries to reserve for symbolic warm-start fine-tuning",
     )
     parser.add_argument(
