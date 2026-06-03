@@ -34,6 +34,10 @@ def _split_stage_train_pool(
 ) -> tuple[list[DeepProbLogGroupedExample], list[DeepProbLogGroupedExample]]:
     if not train_pool:
         raise ValueError("Training pool is empty; nothing to split")
+    if len(train_pool) < 2:
+        raise ValueError(
+            "Training pool must contain at least 2 grouped queries so both stage1 and stage2 are non-empty"
+        )
 
     if stage2_queries is not None and stage2_fraction is not None:
         raise ValueError("Use either --stage2-queries or --stage2-fraction, not both")
@@ -54,9 +58,14 @@ def _split_stage_train_pool(
     if effective_stage2_queries < 1:
         raise ValueError("stage2_queries must be >= 1")
     if effective_stage2_queries >= len(train_pool):
-        raise ValueError(
-            "stage2_queries must be smaller than the size of the global training pool"
+        capped_stage2_queries = len(train_pool) - 1
+        logger.warning(
+            "Requested stage2_queries=%d but the global training pool only contains %d grouped queries; capping stage2_queries to %d to keep stage1 non-empty",
+            effective_stage2_queries,
+            len(train_pool),
+            capped_stage2_queries,
         )
+        effective_stage2_queries = capped_stage2_queries
 
     stage2_examples = select_grouped_example_subset(
         train_pool,
