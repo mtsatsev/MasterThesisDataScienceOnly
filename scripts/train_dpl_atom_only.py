@@ -11,7 +11,14 @@ import pandas as pd
 import torch
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from torch.utils.data import DataLoader, Dataset
 
 from llm_bayesian_reasoning.data.deepproblog_dataset import (
@@ -113,14 +120,22 @@ def _make_metrics(
         "loss": float(sum(losses) / max(len(losses), 1)),
         "accuracy": float(accuracy_score(binary_targets, hard_predictions)),
         "f1": float(f1_score(binary_targets, hard_predictions, zero_division=0)),
+        "precision": float(
+            precision_score(binary_targets, hard_predictions, zero_division=0)
+        ),
+        "recall": float(
+            recall_score(binary_targets, hard_predictions, zero_division=0)
+        ),
         "target_mean": float(sum(soft_targets) / max(len(soft_targets), 1)),
         "prediction_mean": float(sum(predictions) / max(len(predictions), 1)),
     }
     unique_targets = set(binary_targets)
     if len(unique_targets) > 1:
         metrics["roc_auc"] = float(roc_auc_score(binary_targets, predictions))
+        metrics["pr_auc"] = float(average_precision_score(binary_targets, predictions))
     else:
         metrics["roc_auc"] = float("nan")
+        metrics["pr_auc"] = float("nan")
     return metrics
 
 
@@ -320,11 +335,17 @@ def main() -> None:
             "train_loss": train_metrics["loss"],
             "train_accuracy": train_metrics["accuracy"],
             "train_f1": train_metrics["f1"],
+            "train_precision": train_metrics["precision"],
+            "train_recall": train_metrics["recall"],
             "train_roc_auc": train_metrics["roc_auc"],
+            "train_pr_auc": train_metrics["pr_auc"],
             "val_loss": val_metrics["loss"],
             "val_accuracy": val_metrics["accuracy"],
             "val_f1": val_metrics["f1"],
+            "val_precision": val_metrics["precision"],
+            "val_recall": val_metrics["recall"],
             "val_roc_auc": val_metrics["roc_auc"],
+            "val_pr_auc": val_metrics["pr_auc"],
         }
         history.append(epoch_record)
         if val_metrics["f1"] > best_val_f1:
