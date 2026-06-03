@@ -1,8 +1,5 @@
-from __future__ import annotations
-
 import json
 import logging
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -50,15 +47,17 @@ class DeepProbLogModelConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-@dataclass(slots=True)
-class StageOneTrainingSummary:
+class StageOneTrainingSummary(BaseModel):
     losses: list[float]
 
+    model_config = ConfigDict(extra="forbid")
 
-@dataclass(slots=True)
-class DeepProbLogTrainingSummary:
+
+class DeepProbLogTrainingSummary(BaseModel):
     losses: list[float]
     program: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class AtomClassifier(nn.Module):

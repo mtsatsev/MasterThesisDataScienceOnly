@@ -1,15 +1,13 @@
-from __future__ import annotations
-
 import json
 import logging
 import re
-from dataclasses import dataclass
 from hashlib import blake2b
 from pathlib import Path
 from typing import cast
 
 import torch
 import torch.nn as nn
+from pydantic import BaseModel, ConfigDict
 from transformers import DistilBertConfig, DistilBertModel, PreTrainedTokenizerBase
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
@@ -21,14 +19,15 @@ TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+|[^\w\s]", re.UNICODE)
 QUERY_PREFIX = "Query: "
 
 
-@dataclass(frozen=True)
-class DPLPipelineBundleConfig:
+class DPLPipelineBundleConfig(BaseModel):
     tensor_source_name: str
     max_length: int
     vocab_size: int
     hidden_size: int
     n_layers: int
     n_heads: int
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
     def from_dict(cls, payload: dict[str, object]) -> "DPLPipelineBundleConfig":

@@ -12,14 +12,14 @@ import torch
 import torch.nn as nn
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from llm_bayesian_reasoning.data.deepproblog_dataset import (
-    DeepProbLogRow,
     flatten_atom_supervision_examples,
     group_deepproblog_rows,
     read_deepproblog_rows,
+    select_grouped_example_subset,
+    split_grouped_examples,
 )
 
 logger = logging.getLogger("train_dpl_atom_only")
@@ -80,63 +80,26 @@ class AtomOnlyDataset(Dataset):
         }
 
 
-def _select_row_subset(
-    rows: list[DeepProbLogRow],
-    limit: int | None,
-    seed: int,
-) -> list[DeepProbLogRow]:
-    if limit is None or limit >= len(rows):
-        return rows
-    if limit < 1:
-        raise ValueError("max_rows must be >= 1 when provided")
-
-    row_indices = list(range(len(rows)))
-    row_targets = [row.relevance for row in rows]
-    selected_indices, _ = train_test_split(
-        row_indices,
-        train_size=limit,
-        random_state=seed,
-        shuffle=True,
-        stratify=row_targets,
-    )
-    return [rows[index] for index in selected_indices]
+def _to_atom_batch_examples(
+    grouped_examples: list[object],
+) -> list[AtomBatchExample]:
+    flat_examples_raw = flatten_atom_supervision_examples(grouped_examples)
+    return [
+        AtomBatchExample(
+            query=example.query,
+            entity=example.entity,
+            text=example.text,
+            atom=example.atom,
+            target=example.target,
+            binary_target=int(example.target >= 0.5),
+            weight=example.weight,
+        )
+        for example in flat_examples_raw
+    ]
 
 
-def _split_atom_examples(
-    examples: list[AtomBatchExample],
-    seed: int,
-    train_fraction: float,
-    val_fraction: float,
-    test_fraction: float,
-) -> tuple[list[AtomBatchExample], list[AtomBatchExample], list[AtomBatchExample]]:
-    if not abs((train_fraction + val_fraction + test_fraction) - 1.0) < 1e-9:
-        raise ValueError("train_fraction + val_fraction + test_fraction must equal 1")
-
-    indices = list(range(len(examples)))
-    targets = [example.binary_target for example in examples]
-
-    train_indices, holdout_indices = train_test_split(
-        indices,
-        train_size=train_fraction,
-        random_state=seed,
-        shuffle=True,
-        stratify=targets,
-    )
-    holdout_targets = [targets[index] for index in holdout_indices]
-    val_share = val_fraction / (val_fraction + test_fraction)
-    val_indices, test_indices = train_test_split(
-        holdout_indices,
-        train_size=val_share,
-        random_state=seed,
-        shuffle=True,
-        stratify=holdout_targets,
-    )
-
-    return (
-        [examples[index] for index in train_indices],
-        [examples[index] for index in val_indices],
-        [examples[index] for index in test_indices],
-    )
+def _load_grouped_examples(path: Path) -> list[object]:
+    return group_deepproblog_rows(read_deepproblog_rows(path))
 
 
 def _make_metrics(
@@ -189,7 +152,9 @@ def run_epoch(
             loss.backward()
             optimizer.step()
 
-        predictions.extend(float(value) for value in probability.detach().cpu().tolist())
+        predictions.extend(
+            float(value) for value in probability.detach().cpu().tolist()
+        )
         binary_targets.extend(int(value) for value in batch["binary_target"].tolist())
         soft_targets.extend(float(value) for value in batch["target"].tolist())
         losses.append(float(loss.detach().cpu()))
@@ -207,13 +172,21 @@ def main() -> None:
         default=Path("llm_bayesian_reasoning/data/preprocessed_data/dpppl.jsonl"),
         help="DeepProbLog-style JSONL with weak atom supervision fields",
     )
+    parser.add_argument("--train-data-path", type=Path, default=None)
+    parser.add_argument("--val-data-path", type=Path, default=None)
+    parser.add_argument("--test-data-path", type=Path, default=None)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--max-rows", type=int, default=None)
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        help="Optional limit on grouped queries before splitting in single-file mode",
+    )
     parser.add_argument("--train-fraction", type=float, default=0.70)
     parser.add_argument("--val-fraction", type=float, default=0.15)
     parser.add_argument("--test-fraction", type=float, default=0.15)
     parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--max-length", type=int, default=128)
+    parser.add_argument("--max-length", type=int, default=512)
     parser.add_argument("--vocab-size", type=int, default=32768)
     parser.add_argument("--hidden-size", type=int, default=32)
     parser.add_argument("--n-layers", type=int, default=2)
@@ -232,33 +205,54 @@ def main() -> None:
 
     torch.manual_seed(args.seed)
 
+    explicit_split_paths = [
+        args.train_data_path,
+        args.val_data_path,
+        args.test_data_path,
+    ]
+    using_explicit_splits = any(path is not None for path in explicit_split_paths)
+    if using_explicit_splits and not all(
+        path is not None for path in explicit_split_paths
+    ):
+        raise ValueError(
+            "When using explicit split files, provide --train-data-path, --val-data-path, and --test-data-path"
+        )
+
     repo_root = Path(__file__).resolve().parents[1]
     dpl_module = _load_dpl_training_module(repo_root)
 
-    rows = read_deepproblog_rows(args.data_path)
-    rows = _select_row_subset(rows, args.max_rows, args.seed)
-    grouped_examples = group_deepproblog_rows(rows)
-    flat_examples_raw = flatten_atom_supervision_examples(grouped_examples)
-    flat_examples = [
-        AtomBatchExample(
-            query=example.query,
-            entity=example.entity,
-            text=example.text,
-            atom=example.atom,
-            target=example.target,
-            binary_target=int(example.target >= 0.5),
-            weight=example.weight,
+    if using_explicit_splits:
+        train_grouped_examples = _load_grouped_examples(args.train_data_path)
+        val_grouped_examples = _load_grouped_examples(args.val_data_path)
+        test_grouped_examples = _load_grouped_examples(args.test_data_path)
+        source_query_count = (
+            len(train_grouped_examples)
+            + len(val_grouped_examples)
+            + len(test_grouped_examples)
         )
-        for example in flat_examples_raw
-    ]
+        split_mode = "explicit_query_splits"
+    else:
+        grouped_examples = _load_grouped_examples(args.data_path)
+        grouped_examples = select_grouped_example_subset(
+            grouped_examples,
+            args.max_rows,
+            args.seed,
+        )
+        train_grouped_examples, val_grouped_examples, test_grouped_examples = (
+            split_grouped_examples(
+                grouped_examples,
+                train_fraction=args.train_fraction,
+                val_fraction=args.val_fraction,
+                test_fraction=args.test_fraction,
+                seed=args.seed,
+            )
+        )
+        source_query_count = len(grouped_examples)
+        split_mode = "internal_query_split"
 
-    train_examples, val_examples, test_examples = _split_atom_examples(
-        flat_examples,
-        seed=args.seed,
-        train_fraction=args.train_fraction,
-        val_fraction=args.val_fraction,
-        test_fraction=args.test_fraction,
-    )
+    train_examples = _to_atom_batch_examples(train_grouped_examples)
+    val_examples = _to_atom_batch_examples(val_grouped_examples)
+    test_examples = _to_atom_batch_examples(test_grouped_examples)
 
     tensorizer = dpl_module.HashingTextTensorizer(
         vocab_size=args.vocab_size,
@@ -289,13 +283,14 @@ def main() -> None:
 
     total_parameters, trainable_parameters = dpl_module.count_model_parameters(model)
     logger.info(
-        "Loaded %d rows, %d grouped examples, %d atom examples",
-        len(rows),
-        len(grouped_examples),
-        len(flat_examples),
+        "Loaded %d grouped queries into %d/%d/%d query splits",
+        source_query_count,
+        len(train_grouped_examples),
+        len(val_grouped_examples),
+        len(test_grouped_examples),
     )
     logger.info(
-        "Atom split sizes train/validation/test: %d/%d/%d",
+        "Atom example split sizes train/validation/test: %d/%d/%d",
         len(train_examples),
         len(val_examples),
         len(test_examples),
@@ -305,7 +300,9 @@ def main() -> None:
         total_parameters,
         trainable_parameters,
     )
-    logger.info("Device configuration: requested=%s effective=%s", requested_device, device)
+    logger.info(
+        "Device configuration: requested=%s effective=%s", requested_device, device
+    )
 
     history: list[dict[str, float]] = []
     best_state = None
@@ -314,7 +311,9 @@ def main() -> None:
     for epoch in range(1, args.epochs + 1):
         train_metrics = run_epoch(train_loader, model, optimizer, device, training=True)
         with torch.no_grad():
-            val_metrics = run_epoch(val_loader, model, optimizer, device, training=False)
+            val_metrics = run_epoch(
+                val_loader, model, optimizer, device, training=False
+            )
 
         epoch_record = {
             "epoch": float(epoch),
@@ -360,7 +359,17 @@ def main() -> None:
         "metadata": {
             "artifact_type": "dpl_pipeline_bundle",
             "training_mode": "atom_only",
+            "split_mode": split_mode,
             "data_path": str(args.data_path),
+            "train_data_path": (
+                None if args.train_data_path is None else str(args.train_data_path)
+            ),
+            "val_data_path": (
+                None if args.val_data_path is None else str(args.val_data_path)
+            ),
+            "test_data_path": (
+                None if args.test_data_path is None else str(args.test_data_path)
+            ),
             "max_rows": args.max_rows,
             "train_fraction": args.train_fraction,
             "val_fraction": args.val_fraction,
@@ -389,9 +398,16 @@ def main() -> None:
         json.dumps(
             {
                 "split_sizes": {
-                    "train": len(train_examples),
-                    "validation": len(val_examples),
-                    "test": len(test_examples),
+                    "queries": {
+                        "train": len(train_grouped_examples),
+                        "validation": len(val_grouped_examples),
+                        "test": len(test_grouped_examples),
+                    },
+                    "atom_examples": {
+                        "train": len(train_examples),
+                        "validation": len(val_examples),
+                        "test": len(test_examples),
+                    },
                 },
                 "best_validation_f1": best_val_f1,
                 "test_metrics": test_metrics,

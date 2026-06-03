@@ -1,12 +1,12 @@
-from __future__ import annotations
-
 import json
+import math
 import re
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from sklearn.model_selection import train_test_split
 from torch.utils.data import Dataset
 
 
@@ -195,6 +195,177 @@ def group_deepproblog_rows(
 
     grouped_examples.sort(key=lambda example: str(example.id))
     return grouped_examples
+
+
+def _query_stratum(example: DeepProbLogGroupedExample) -> str:
+    template = (example.template or "").strip().lower()
+    domain = (example.domain or "").strip().lower()
+    atom_bucket = str(min(len(example.atoms), 4))
+    candidate_bucket = str(min(len(example.candidates), 4))
+    positive_bucket = str(
+        min(sum(int(candidate.relevance > 0) for candidate in example.candidates), 3)
+    )
+
+    if template:
+        return f"template:{template}|atoms:{atom_bucket}|positives:{positive_bucket}"
+    if domain:
+        return f"domain:{domain}|atoms:{atom_bucket}|positives:{positive_bucket}"
+    return (
+        f"atoms:{atom_bucket}|candidates:{candidate_bucket}|positives:{positive_bucket}"
+    )
+
+
+def _stratify_labels(
+    grouped_examples: list[DeepProbLogGroupedExample],
+) -> list[str] | None:
+    if len(grouped_examples) < 2:
+        return None
+
+    labels = [_query_stratum(example) for example in grouped_examples]
+    counts = {label: labels.count(label) for label in set(labels)}
+    if len(counts) < 2:
+        return None
+    if min(counts.values()) < 2:
+        return None
+    return labels
+
+
+def _split_grouped_indices(
+    indices: list[int],
+    train_size: float | int,
+    seed: int,
+    grouped_examples: list[DeepProbLogGroupedExample],
+) -> tuple[list[int], list[int]]:
+    stratify_labels = _stratify_labels(grouped_examples)
+    stratify = None
+    if stratify_labels is not None:
+        stratify = [stratify_labels[index] for index in indices]
+
+    try:
+        train_indices, holdout_indices = train_test_split(
+            indices,
+            train_size=train_size,
+            random_state=seed,
+            shuffle=True,
+            stratify=stratify,
+        )
+    except ValueError:
+        train_indices, holdout_indices = train_test_split(
+            indices,
+            train_size=train_size,
+            random_state=seed,
+            shuffle=True,
+            stratify=None,
+        )
+    return list(train_indices), list(holdout_indices)
+
+
+def select_grouped_example_subset(
+    grouped_examples: list[DeepProbLogGroupedExample],
+    limit: int | None,
+    seed: int,
+) -> list[DeepProbLogGroupedExample]:
+    if limit is None or limit >= len(grouped_examples):
+        return grouped_examples
+    if limit < 1:
+        raise ValueError("limit must be >= 1 when provided")
+
+    selected_indices, _ = _split_grouped_indices(
+        indices=list(range(len(grouped_examples))),
+        train_size=limit,
+        seed=seed,
+        grouped_examples=grouped_examples,
+    )
+    selected_examples = [grouped_examples[index] for index in selected_indices]
+    selected_examples.sort(key=lambda example: str(example.id))
+    return selected_examples
+
+
+def split_grouped_examples(
+    grouped_examples: list[DeepProbLogGroupedExample],
+    train_fraction: float,
+    val_fraction: float,
+    test_fraction: float,
+    seed: int,
+) -> tuple[
+    list[DeepProbLogGroupedExample],
+    list[DeepProbLogGroupedExample],
+    list[DeepProbLogGroupedExample],
+]:
+    total = train_fraction + val_fraction + test_fraction
+    if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        raise ValueError("train_fraction + val_fraction + test_fraction must equal 1")
+    if any(value < 0.0 for value in (train_fraction, val_fraction, test_fraction)):
+        raise ValueError("split fractions must be >= 0")
+    if not grouped_examples:
+        return [], [], []
+
+    all_indices = list(range(len(grouped_examples)))
+    if math.isclose(train_fraction, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        return list(grouped_examples), [], []
+    if math.isclose(train_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        train_indices = []
+        holdout_indices = all_indices
+    else:
+        train_indices, holdout_indices = _split_grouped_indices(
+            indices=all_indices,
+            train_size=train_fraction,
+            seed=seed,
+            grouped_examples=grouped_examples,
+        )
+
+    holdout_total = val_fraction + test_fraction
+    if math.isclose(holdout_total, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_indices = []
+        test_indices = []
+    elif math.isclose(val_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_indices = []
+        test_indices = holdout_indices
+    elif math.isclose(test_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_indices = holdout_indices
+        test_indices = []
+    else:
+        val_share = val_fraction / holdout_total
+        val_indices, test_indices = _split_grouped_indices(
+            indices=holdout_indices,
+            train_size=val_share,
+            seed=seed,
+            grouped_examples=grouped_examples,
+        )
+
+    return (
+        [grouped_examples[index] for index in train_indices],
+        [grouped_examples[index] for index in val_indices],
+        [grouped_examples[index] for index in test_indices],
+    )
+
+
+def rows_from_grouped_examples(
+    grouped_examples: list[DeepProbLogGroupedExample],
+) -> list[DeepProbLogRow]:
+    rows: list[DeepProbLogRow] = []
+    for example in grouped_examples:
+        for candidate in example.candidates:
+            rows.append(
+                DeepProbLogRow(
+                    id=example.id,
+                    query=example.query,
+                    original_query=example.original_query,
+                    atoms=list(example.atoms),
+                    negated_atoms=list(example.negated_atoms),
+                    logical_query=example.logical_query,
+                    entity=candidate.entity,
+                    text=candidate.text,
+                    relevance=candidate.relevance,
+                    weight=candidate.weight,
+                    source=candidate.source,
+                    domain=example.domain,
+                    template=example.template,
+                    evidence_ratings=candidate.evidence_ratings,
+                    attributions=candidate.attributions,
+                )
+            )
+    return rows
 
 
 def flatten_atom_supervision_examples(

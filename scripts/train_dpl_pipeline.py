@@ -6,9 +6,9 @@ import math
 import random
 import re
 import time
+from collections import Counter
 from collections.abc import Mapping
 from contextlib import contextmanager, nullcontext
-from dataclasses import asdict, dataclass, replace
 from hashlib import blake2b
 from itertools import product
 from pathlib import Path
@@ -26,6 +26,7 @@ from deepproblog.network import Network
 from deepproblog.query import Query
 from deepproblog.train import TrainObject
 from problog.logic import Constant, Term
+from pydantic import BaseModel, ConfigDict
 from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader as TorchDataLoader
 from torch.utils.data import Dataset as TorchDataset
@@ -36,10 +37,12 @@ logger = logging.getLogger("train_dpl_pipeline")
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_]+|[^\w\s]", re.UNICODE)
 
 
-@dataclass(slots=True)
-class TrainingConfig:
+class TrainingConfig(BaseModel):
     seed: int
-    data_path: Path
+    data_path: Path | None
+    train_data_path: Path | None
+    val_data_path: Path | None
+    test_data_path: Path | None
     output_dir: Path
     max_examples: int | None
     compute_baseline_metrics: bool
@@ -62,11 +65,32 @@ class TrainingConfig:
     mlflow_experiment_name: str
     mlflow_run_name: str | None
 
+    model_config = ConfigDict(extra="forbid")
+
     @classmethod
     def from_dict(cls, raw: dict[str, Any]) -> "TrainingConfig":
         return cls(
             seed=int(raw.get("seed", 7)),
-            data_path=Path(raw["data_path"]),
+            data_path=(
+                None
+                if raw.get("data_path") in (None, "")
+                else Path(str(raw["data_path"]))
+            ),
+            train_data_path=(
+                None
+                if raw.get("train_data_path") in (None, "")
+                else Path(str(raw["train_data_path"]))
+            ),
+            val_data_path=(
+                None
+                if raw.get("val_data_path") in (None, "")
+                else Path(str(raw["val_data_path"]))
+            ),
+            test_data_path=(
+                None
+                if raw.get("test_data_path") in (None, "")
+                else Path(str(raw["test_data_path"]))
+            ),
             output_dir=Path(raw["output_dir"]),
             max_examples=(
                 None if raw.get("max_examples") is None else int(raw["max_examples"])
@@ -104,11 +128,27 @@ class TrainingConfig:
             ),
         )
 
-    def validate(self) -> None:
+    def validate_config(self) -> None:
         total = self.train_fraction + self.val_fraction + self.test_fraction
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=1e-9):
             raise ValueError(
                 "train_fraction + val_fraction + test_fraction must equal 1.0"
+            )
+        explicit_split_paths = [
+            self.train_data_path,
+            self.val_data_path,
+            self.test_data_path,
+        ]
+        using_explicit_splits = any(path is not None for path in explicit_split_paths)
+        if using_explicit_splits and not all(
+            path is not None for path in explicit_split_paths
+        ):
+            raise ValueError(
+                "Explicit split mode requires train_data_path, val_data_path, and test_data_path"
+            )
+        if not using_explicit_splits and self.data_path is None:
+            raise ValueError(
+                "Either data_path or the explicit train/validation/test split paths must be provided"
             )
         if self.batch_size < 1:
             raise ValueError("batch_size must be >= 1")
@@ -120,8 +160,17 @@ class TrainingConfig:
             )
 
     def to_json_dict(self) -> dict[str, Any]:
-        payload = asdict(self)
-        payload["data_path"] = str(self.data_path)
+        payload = self.model_dump()
+        payload["data_path"] = None if self.data_path is None else str(self.data_path)
+        payload["train_data_path"] = (
+            None if self.train_data_path is None else str(self.train_data_path)
+        )
+        payload["val_data_path"] = (
+            None if self.val_data_path is None else str(self.val_data_path)
+        )
+        payload["test_data_path"] = (
+            None if self.test_data_path is None else str(self.test_data_path)
+        )
         payload["output_dir"] = str(self.output_dir)
         return payload
 
@@ -138,8 +187,7 @@ def parse_bool(value: object) -> bool:
     return bool(value)
 
 
-@dataclass(frozen=True)
-class ExampleRow:
+class ExampleRow(BaseModel):
     example_id: int
     query_id: int
     query_text: str
@@ -152,13 +200,14 @@ class ExampleRow:
     weight: float
     source: str
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     @property
     def target_probability(self) -> float:
         return float(self.relevance)
 
 
-@dataclass(frozen=True)
-class AtomRecord:
+class AtomRecord(BaseModel):
     atom_id: int
     example_id: int
     query_id: int
@@ -168,23 +217,28 @@ class AtomRecord:
     candidate_text: str
     entity: str
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
     def model_input_segments(self) -> tuple[str, ...]:
         return (self.query_text, self.atom_text, self.candidate_text)
 
 
-@dataclass(frozen=True)
-class AtomNode:
+class AtomNode(BaseModel):
     text: str
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-@dataclass(frozen=True)
-class AndNode:
+
+class AndNode(BaseModel):
     children: tuple[object, ...]
 
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-@dataclass(frozen=True)
-class OrNode:
+
+class OrNode(BaseModel):
     children: tuple[object, ...]
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
 
 class AtomTensorSource(Mapping):
@@ -362,7 +416,7 @@ def collapse_whitespace(text: str) -> str:
 def load_training_config(path: Path) -> TrainingConfig:
     raw = json.loads(path.read_text(encoding="utf-8"))
     config = TrainingConfig.from_dict(raw)
-    config.validate()
+    config.validate_config()
     return config
 
 
@@ -442,12 +496,16 @@ def select_example_subset(
     if limit < 1:
         raise ValueError("max_examples must be >= 1 when provided")
 
-    split_frame = pd.DataFrame(
-        {
-            "index": list(range(len(examples))),
-            "target": [example.relevance for example in examples],
-        }
-    )
+    split_frame = build_query_split_frame(examples)
+    if limit >= len(split_frame):
+        logger.info(
+            "max_examples=%d covers all %d grouped queries; keeping the full dataset",
+            limit,
+            len(split_frame),
+        )
+        return examples
+
+    stratify = build_query_stratify_labels(split_frame)
 
     try:
         subset_frame, _ = train_test_split(
@@ -455,11 +513,11 @@ def select_example_subset(
             train_size=limit,
             random_state=seed,
             shuffle=True,
-            stratify=split_frame["target"],
+            stratify=stratify,
         )
     except ValueError as exc:
         logger.warning(
-            "Falling back to unstratified max_examples sampling for %d examples: %s",
+            "Falling back to unstratified max_examples sampling for %d grouped queries: %s",
             limit,
             exc,
         )
@@ -471,13 +529,78 @@ def select_example_subset(
             stratify=None,
         )
 
+    selected_query_ids = set(
+        int(query_id) for query_id in subset_frame["query_id"].tolist()
+    )
     selected_examples = [
-        examples[int(index)] for index in subset_frame["index"].tolist()
+        example for example in examples if example.query_id in selected_query_ids
     ]
     return [
-        replace(example, example_id=new_id)
+        example.model_copy(update={"example_id": new_id})
         for new_id, example in enumerate(selected_examples)
     ]
+
+
+def build_query_split_frame(examples: list[ExampleRow]) -> pd.DataFrame:
+    grouped_queries: dict[int, dict[str, int | float]] = {}
+    for example in examples:
+        state = grouped_queries.setdefault(
+            example.query_id,
+            {
+                "query_id": example.query_id,
+                "target": 0.0,
+                "atom_count": len(example.atoms),
+                "candidate_count": 0,
+            },
+        )
+        state["target"] = max(float(state["target"]), float(example.relevance))
+        state["candidate_count"] = int(state["candidate_count"]) + 1
+
+    return (
+        pd.DataFrame(grouped_queries.values())
+        .sort_values("query_id")
+        .reset_index(drop=True)
+    )
+
+
+def build_query_stratify_labels(split_frame: pd.DataFrame) -> pd.Series | None:
+    labels = split_frame.apply(
+        lambda row: (
+            f"target:{int(float(row['target']) >= 0.5)}|"
+            f"atoms:{min(int(row['atom_count']), 4)}|"
+            f"candidates:{min(int(row['candidate_count']), 4)}"
+        ),
+        axis=1,
+    )
+    counts = Counter(labels.tolist())
+    if len(counts) < 2 or min(counts.values()) < 2:
+        return None
+    return labels
+
+
+def split_query_frame(
+    split_frame: pd.DataFrame,
+    train_size: float | int,
+    seed: int,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    stratify = build_query_stratify_labels(split_frame)
+    try:
+        train_frame, holdout_frame = train_test_split(
+            split_frame,
+            train_size=train_size,
+            random_state=seed,
+            shuffle=True,
+            stratify=stratify,
+        )
+    except ValueError:
+        train_frame, holdout_frame = train_test_split(
+            split_frame,
+            train_size=train_size,
+            random_state=seed,
+            shuffle=True,
+            stratify=None,
+        )
+    return train_frame, holdout_frame
 
 
 def split_indices(
@@ -487,33 +610,93 @@ def split_indices(
     test_fraction: float,
     seed: int,
 ) -> tuple[list[int], list[int], list[int]]:
-    split_frame = pd.DataFrame(
-        {
-            "index": list(range(len(examples))),
-            "target": [example.relevance for example in examples],
-        }
-    )
+    query_frame = build_query_split_frame(examples)
+    query_indices_by_id: dict[int, list[int]] = {}
+    for index, example in enumerate(examples):
+        query_indices_by_id.setdefault(example.query_id, []).append(index)
 
-    train_frame, holdout_frame = train_test_split(
-        split_frame,
+    if math.isclose(train_fraction, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        train_query_ids = set(
+            int(query_id) for query_id in query_frame["query_id"].tolist()
+        )
+        return (
+            [
+                index
+                for query_id in train_query_ids
+                for index in query_indices_by_id[query_id]
+            ],
+            [],
+            [],
+        )
+
+    train_frame, holdout_frame = split_query_frame(
+        query_frame,
         train_size=train_fraction,
-        random_state=seed,
-        shuffle=True,
-        stratify=split_frame["target"],
+        seed=seed,
     )
-    val_share = val_fraction / (val_fraction + test_fraction)
-    val_frame, test_frame = train_test_split(
-        holdout_frame,
-        train_size=val_share,
-        random_state=seed,
-        shuffle=True,
-        stratify=holdout_frame["target"],
+    if math.isclose(val_fraction + test_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_frame = holdout_frame.iloc[0:0]
+        test_frame = holdout_frame.iloc[0:0]
+    elif math.isclose(val_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_frame = holdout_frame.iloc[0:0]
+        test_frame = holdout_frame
+    elif math.isclose(test_fraction, 0.0, rel_tol=0.0, abs_tol=1e-9):
+        val_frame = holdout_frame
+        test_frame = holdout_frame.iloc[0:0]
+    else:
+        val_share = val_fraction / (val_fraction + test_fraction)
+        val_frame, test_frame = split_query_frame(
+            holdout_frame,
+            train_size=val_share,
+            seed=seed,
+        )
+
+    train_query_ids = set(
+        int(query_id) for query_id in train_frame["query_id"].tolist()
     )
+    val_query_ids = set(int(query_id) for query_id in val_frame["query_id"].tolist())
+    test_query_ids = set(int(query_id) for query_id in test_frame["query_id"].tolist())
 
     return (
-        train_frame["index"].tolist(),
-        val_frame["index"].tolist(),
-        test_frame["index"].tolist(),
+        [
+            index
+            for query_id in train_query_ids
+            for index in query_indices_by_id[query_id]
+        ],
+        [
+            index
+            for query_id in val_query_ids
+            for index in query_indices_by_id[query_id]
+        ],
+        [
+            index
+            for query_id in test_query_ids
+            for index in query_indices_by_id[query_id]
+        ],
+    )
+
+
+def load_explicit_split_examples(
+    train_path: Path,
+    val_path: Path,
+    test_path: Path,
+) -> tuple[list[ExampleRow], list[int], list[int], list[int]]:
+    train_examples = load_examples(train_path)
+    val_examples = load_examples(val_path)
+    test_examples = load_examples(test_path)
+
+    combined_examples = train_examples + val_examples + test_examples
+    reindexed_examples = [
+        example.model_copy(update={"example_id": new_id})
+        for new_id, example in enumerate(combined_examples)
+    ]
+    train_stop = len(train_examples)
+    val_stop = train_stop + len(val_examples)
+    return (
+        reindexed_examples,
+        list(range(0, train_stop)),
+        list(range(train_stop, val_stop)),
+        list(range(val_stop, len(reindexed_examples))),
     )
 
 
@@ -1092,18 +1275,32 @@ def train_model_from_config(
     torch.manual_seed(config.seed)
     torch.set_printoptions(edgeitems=3, linewidth=120)
 
-    with log_major_operation(f"Loading examples from {config.data_path}"):
-        examples = load_examples(config.data_path)
-        examples = select_example_subset(examples, config.max_examples, config.seed)
+    if (
+        config.train_data_path is not None
+        and config.val_data_path is not None
+        and config.test_data_path is not None
+    ):
+        with log_major_operation("Loading explicit train/validation/test examples"):
+            examples, train_indices, val_indices, test_indices = (
+                load_explicit_split_examples(
+                    config.train_data_path,
+                    config.val_data_path,
+                    config.test_data_path,
+                )
+            )
+    else:
+        with log_major_operation(f"Loading examples from {config.data_path}"):
+            examples = load_examples(config.data_path)
+            examples = select_example_subset(examples, config.max_examples, config.seed)
 
-    with log_major_operation("Splitting examples into train/validation/test"):
-        train_indices, val_indices, test_indices = split_indices(
-            examples,
-            config.train_fraction,
-            config.val_fraction,
-            config.test_fraction,
-            config.seed,
-        )
+        with log_major_operation("Splitting examples into train/validation/test"):
+            train_indices, val_indices, test_indices = split_indices(
+                examples,
+                config.train_fraction,
+                config.val_fraction,
+                config.test_fraction,
+                config.seed,
+            )
 
     with log_major_operation("Expanding examples into atom records"):
         atom_records, atom_records_by_example = build_atom_records(examples)

@@ -1,7 +1,5 @@
 """Retrieval evaluation metrics: P@K, R@K, F1@K, NDCG@K, MRR."""
 
-from __future__ import annotations
-
 import logging
 import math
 
