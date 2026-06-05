@@ -20,7 +20,7 @@
       "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "TrueFalseLLM",
         "include_retrieved_text": true
@@ -33,7 +33,7 @@
       "top_k": 10,
       "logic_backend": "ProbLog",
       "estimator_config": {
-        "model_name": "microsoft/phi-2",
+        "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
         "estimator_type": "YesNoContinuation",
         "include_retrieved_text": true,
