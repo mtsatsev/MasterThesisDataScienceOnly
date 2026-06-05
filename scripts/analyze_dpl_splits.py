@@ -142,7 +142,9 @@ def _evidence_bucket_flags(candidate: DeepProbLogCandidate) -> tuple[bool, bool]
     return has_partial, has_complete
 
 
-def _summarize_split(grouped_examples: list[DeepProbLogGroupedExample]) -> dict[str, object]:
+def _summarize_split(
+    grouped_examples: list[DeepProbLogGroupedExample],
+) -> dict[str, object]:
     query_lengths = [len(_tokenize(example.query)) for example in grouped_examples]
     atoms_per_query = [len(example.atoms) for example in grouped_examples]
     candidates_per_query = [len(example.candidates) for example in grouped_examples]
@@ -249,8 +251,12 @@ def _build_alerts(report: dict[str, object]) -> list[str]:
             f"Positive rate differs materially between train and validation ({positive_rate_delta:+.3f})."
         )
 
-    train_overlap = train_summary["difficulty_proxies"]["positive_query_text_overlap"]["mean"]
-    val_overlap = validation_summary["difficulty_proxies"]["positive_query_text_overlap"]["mean"]
+    train_overlap = train_summary["difficulty_proxies"]["positive_query_text_overlap"][
+        "mean"
+    ]
+    val_overlap = validation_summary["difficulty_proxies"][
+        "positive_query_text_overlap"
+    ]["mean"]
     overlap_delta = _safe_delta(train_overlap, val_overlap)
     if not math.isnan(overlap_delta) and overlap_delta >= 0.05:
         alerts.append(
@@ -266,7 +272,9 @@ def _build_alerts(report: dict[str, object]) -> list[str]:
         )
 
     train_evidence = train_summary["weak_label_quality"]["positive_has_evidence_rate"]
-    val_evidence = validation_summary["weak_label_quality"]["positive_has_evidence_rate"]
+    val_evidence = validation_summary["weak_label_quality"][
+        "positive_has_evidence_rate"
+    ]
     evidence_delta = _safe_delta(train_evidence, val_evidence)
     if not math.isnan(evidence_delta) and evidence_delta >= 0.05:
         alerts.append(

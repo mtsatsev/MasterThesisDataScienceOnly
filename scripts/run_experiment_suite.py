@@ -12,7 +12,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from llm_bayesian_reasoning.estimators.factory import (
     create_estimator_from_components,

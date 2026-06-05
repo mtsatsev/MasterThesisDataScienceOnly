@@ -1,0 +1,44 @@
+{
+  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test_seed7_k30.jsonl",
+  "results_root": "llm_bayesian_reasoning/results",
+  "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
+  "use_metadata_ground_truth": true,
+  "retrievers": [
+    {
+      "name": "bm25-main",
+      "retriever_type": "BM25",
+      "index_path": "index/bm25_dataset",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "retrieval_pool_size": 50
+    }
+  ],
+  "variants": [
+    {
+      "name": "bm25_truefalse_ctx_30q",
+      "retriever_name": "bm25-main",
+      "top_n": 50,
+      "top_k": 10,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "TrueFalseLLM",
+        "include_retrieved_text": true
+      }
+    },
+    {
+      "name": "bm25_yesno_ctx_30q",
+      "retriever_name": "bm25-main",
+      "top_n": 50,
+      "top_k": 10,
+      "logic_backend": "ProbLog",
+      "estimator_config": {
+        "model_name": "microsoft/phi-2",
+        "device": "cuda",
+        "estimator_type": "YesNoContinuation",
+        "include_retrieved_text": true,
+        "contrastive_temperature": 1.0
+      }
+    }
+  ]
+}

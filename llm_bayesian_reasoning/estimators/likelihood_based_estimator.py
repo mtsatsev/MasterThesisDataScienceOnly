@@ -69,7 +69,8 @@ class LikelihoodBasedEstimator(BaseEstimator):
         Returns:
             float: The conditional loss of the atom being true for the entity.
         """
-        ctx = self.tokenizer(atom.to_prompt_with_context(entity), return_tensors="pt")
+        context_text = (atom.context.strip() + "\n\n") if atom.context else ""
+        ctx = self.tokenizer(context_text, return_tensors="pt")
         hypothesis = self.tokenizer(
             atom.to_prompt(entity).strip(),
             return_tensors="pt",

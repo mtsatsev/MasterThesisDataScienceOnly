@@ -34,6 +34,7 @@ class EstimatorType(str, Enum):
     TRUE_FALSE_LLM = "TrueFalseLLM"
     LIKELIHOOD_BASED_PERPLEXITY = "Perplexity"
     LIKELIHOOD_BASED_CONTRASTIVE = "Contrastive"
+    LIKELIHOOD_BASED_YES_NO = "YesNoContinuation"
     DEEP_PROBLOG = "DeepProbLog"
     DPL_PIPELINE = "DPLPipeline"
 
@@ -141,6 +142,11 @@ class EstimatorConfig(BaseModel):
             if self.contrastive_temperature is None:
                 raise ValueError(
                     "contrastive_temperature is required for likelihood-based estimators"
+                )
+        if self.estimator_type == EstimatorType.LIKELIHOOD_BASED_YES_NO:
+            if self.contrastive_temperature is None:
+                raise ValueError(
+                    "contrastive_temperature is required for yes/no continuation estimation"
                 )
         if self.estimator_type == EstimatorType.DEEP_PROBLOG:
             if self.deepproblog_model_dir is None:

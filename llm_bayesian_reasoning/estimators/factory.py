@@ -17,6 +17,9 @@ from llm_bayesian_reasoning.estimators.dpl_pipeline_estimator import (
 from llm_bayesian_reasoning.estimators.likelihood_based_estimator import (
     LikelihoodBasedEstimator,
 )
+from llm_bayesian_reasoning.estimators.likelihood_based_yes_no_estimator import (
+    LikelihoodBasedYesNoEstimator,
+)
 from llm_bayesian_reasoning.estimators.true_false_lm_estimator import (
     TrueFalseLLMEstimator,
 )
@@ -72,6 +75,14 @@ def create_estimator_from_components(
 
     if etype == EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE:
         return LikelihoodBasedEstimator(
+            model=model,
+            tokenizer=tokenizer,
+            device=estimator_config.device,
+            contrastive_temperature=estimator_config.contrastive_temperature,
+        )
+
+    if etype == EstimatorType.LIKELIHOOD_BASED_YES_NO:
+        return LikelihoodBasedYesNoEstimator(
             model=model,
             tokenizer=tokenizer,
             device=estimator_config.device,
