@@ -10,6 +10,15 @@
       "index_path": "index/bm25_dataset",
       "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
       "retrieval_pool_size": 50
+    },
+    {
+      "name": "e5-main",
+      "retriever_type": "E5",
+      "index_path": "index/e5",
+      "documents_path": "llm_bayesian_reasoning/data/index_data/documents.jsonl",
+      "batch_size": 1000,
+      "retriever_model_name": "intfloat/e5-base-v2",
+      "retrieval_pool_size": 50
     }
   ],
   "variants": [
