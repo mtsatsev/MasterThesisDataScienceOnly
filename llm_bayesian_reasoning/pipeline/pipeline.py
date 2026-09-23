@@ -148,8 +148,13 @@ def score_candidate_documents(
     logic_backend: LogicBackend,
     include_retrieved_text: bool = False,
     record_id: int | str | None = None,
+    atom_scores: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, float]:
-    """Score an ordered candidate pool for a single record."""
+    """Score an ordered candidate pool for a single record.
+
+    If ``atom_scores`` is given, it is filled with the per-atom probabilities
+    of each entity so logic and calibration can be replayed offline.
+    """
     entity_scores: dict[str, float] = {}
     for document in candidate_documents:
         entity = document.title
@@ -170,6 +175,8 @@ def score_candidate_documents(
             )
             continue
         entity_scores[entity] = probability
+        if atom_scores is not None:
+            atom_scores[entity] = {a.atom: a.probability for a in scored_atoms}
         logger.debug("  entity=%r  prob=%.4f", entity, probability)
     return entity_scores
 
@@ -376,6 +383,7 @@ def run_pipeline(
                     continue
 
                 # --- Steps 2–3: LLM scoring + Problog evaluation ---
+                atom_scores: dict[str, dict[str, float]] = {}
                 entity_scores = score_candidate_documents(
                     atoms=atoms,
                     formula=formula,
@@ -384,6 +392,7 @@ def run_pipeline(
                     logic_backend=logic_backend,
                     include_retrieved_text=config.estimator_config.include_retrieved_text,
                     record_id=record_id,
+                    atom_scores=atom_scores,
                 )
 
                 # --- Step 4: Rerank to top-K ---
@@ -399,6 +408,7 @@ def run_pipeline(
                     top_k=config.top_k,
                     relevant=relevant,
                 )
+                record_result["atom_scores"] = atom_scores
                 ranked_entities = record_result["ranked_entities"]
                 retrieved_entities = record_result["retrieved_entities"]
 

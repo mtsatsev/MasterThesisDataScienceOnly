@@ -48,6 +48,33 @@ def reciprocal_rank(ranked: list[str], relevant: set[str]) -> float:
     return 0.0
 
 
+def oracle_ranking(candidates: list[str], relevant: set[str]) -> list[str]:
+    """Best possible reordering of ``candidates`` with respect to ``relevant``.
+
+    Stable-partitions ``candidates`` into relevant entities first (preserving
+    their original relative order) followed by the remaining, non-relevant
+    entities (also preserving their original relative order).
+
+    Since P@K/R@K/F1@K/NDCG@K/MRR all treat relevance as binary and are
+    insensitive to ordering among entities of equal relevance, this ranking
+    is the true ceiling achievable by any reranker restricted to this exact
+    candidate pool: no permutation of ``candidates`` can score higher on any
+    of those metrics.
+
+    Args:
+        candidates: The fixed candidate pool (e.g. the top-N retrieval
+            results), in their original order.
+        relevant: Set of ground-truth entity names.
+
+    Returns:
+        A reordering of ``candidates`` (same elements, same length) with all
+        relevant entities moved to the front.
+    """
+    relevant_hits = [c for c in candidates if c in relevant]
+    non_hits = [c for c in candidates if c not in relevant]
+    return relevant_hits + non_hits
+
+
 def compute_record_metrics(
     ranked: list[str],
     relevant: set[str],

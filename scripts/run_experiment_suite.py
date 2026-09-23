@@ -523,6 +523,7 @@ def main() -> None:
                             record,
                             scoring_variant.estimator_config.estimator_type,
                         )
+                        atom_scores: dict[str, dict[str, float]] = {}
                         entity_scores = score_candidate_documents(
                             atoms=atoms,
                             formula=record["problog_formula"],
@@ -531,6 +532,7 @@ def main() -> None:
                             logic_backend=logic_backend,
                             include_retrieved_text=scoring_variant.estimator_config.include_retrieved_text,
                             record_id=record_id,
+                            atom_scores=atom_scores,
                         )
 
                         for variant in scoring_variants:
@@ -548,6 +550,10 @@ def main() -> None:
                                 top_k=variant.top_k,
                                 relevant=relevant,
                             )
+                            record_result["atom_scores"] = {
+                                entity: atom_scores[entity]
+                                for entity in record_result["ranked_entities"]
+                            }
                             variant_state = variant_states[variant.name]
                             variant_state["results"][record_id] = record_result
                             _write_result(

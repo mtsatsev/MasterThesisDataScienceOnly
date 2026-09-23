@@ -1,15 +1,16 @@
+import math
+
 import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    DynamicCache,
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.problog_models.problog_models import ProblogAtom
-
-LABEL_IGNORE = -100
 
 
 class LikelihoodBasedYesNoEstimator(BaseEstimator):
@@ -159,98 +160,13 @@ class LikelihoodBasedYesNoEstimator(BaseEstimator):
         )
         return "\n".join(prefix_parts)
 
-    def _conditional_loss_for_continuation(
-        self,
-        prefix: str,
-        continuation: str,
-    ) -> float:
-        """Score a chosen continuation under a fixed prefix with teacher forcing.
-
-        Args:
-            prefix: Fixed prompt prefix.
-            continuation: Candidate continuation appended to the prefix.
-
-        Returns:
-            Mean language-model loss over the continuation tokens only.
-
-        This method does not use free generation. Instead, it appends the
-        continuation to the prefix, masks the prefix tokens with ``LABEL_IGNORE``,
-        and asks the model how likely the continuation tokens are.
-
-        Mini example:
-
-        If ``prefix`` ends with ``Answer:``, calling:
-
-        - ``_conditional_loss_for_continuation(prefix, " yes")``
-        - ``_conditional_loss_for_continuation(prefix, " no")``
-
-        measures which answer continuation is more likely after the same prompt.
-        """
-        prefix_inputs = self.tokenizer(prefix, return_tensors="pt")
-        continuation_inputs = self.tokenizer(
-            continuation,
-            return_tensors="pt",
-            add_special_tokens=False,
-        )
-
-        model_device = next(self.model.parameters()).device
-        input_ids = torch.cat(
-            [prefix_inputs["input_ids"], continuation_inputs["input_ids"]], dim=1
-        ).to(model_device)
-        attention_mask = torch.cat(
-            [
-                prefix_inputs["attention_mask"],
-                continuation_inputs["attention_mask"],
-            ],
-            dim=1,
-        ).to(model_device)
-        labels = input_ids.clone()
-        labels[:, : prefix_inputs["input_ids"].size(1)] = LABEL_IGNORE
-
-        with torch.no_grad():
-            outputs = self.model(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                labels=labels,
+    def _answer_token_id(self, continuation: str) -> int:
+        token_ids = self.tokenizer(continuation, add_special_tokens=False)["input_ids"]
+        if len(token_ids) != 1:
+            raise ValueError(
+                f"Continuation {continuation!r} must be a single token, got {token_ids}"
             )
-        return float(outputs.loss.item())
-
-    def prob_yes_no(self, atom: ProblogAtom, entity: str) -> float:
-        """Compute the contrastive yes/no probability for a predicate.
-
-        Args:
-            atom: Predicate to score.
-            entity: Concrete entity substituted into the atom text.
-
-        Returns:
-            A probability-like score for the positive answer continuation.
-
-        The computation is:
-
-        - build the shared prefix
-        - compute ``loss_yes`` for ``self.positive_continuation``
-        - compute ``loss_no`` for ``self.negative_continuation``
-        - return ``sigmoid((loss_no - loss_yes) / temperature)``
-
-        Mini example:
-
-        If ``loss_yes = 8.4`` and ``loss_no = 12.6``, then the returned
-        probability is high, because ``yes`` is the more likely continuation.
-        """
-        prefix = self._build_answer_prefix(atom, entity)
-        yes_loss = self._conditional_loss_for_continuation(
-            prefix,
-            self.positive_continuation,
-        )
-        no_loss = self._conditional_loss_for_continuation(
-            prefix,
-            self.negative_continuation,
-        )
-        delta = (no_loss - yes_loss) / max(
-            1e-8,
-            float(self.contrastive_temperature),
-        )
-        return float(torch.sigmoid(torch.tensor(delta)).item())
+        return token_ids[0]
 
     def score_probability(
         self,
@@ -270,24 +186,53 @@ class LikelihoodBasedYesNoEstimator(BaseEstimator):
             A list of ``ProblogAtom`` objects with the estimated probability in
             the ``probability`` field.
 
-        Mini example:
-
-        Given one atom such as ``{X} is a science fiction film``, this method
-        returns a new ``ProblogAtom`` with the same ``atom`` text and a
-        probability derived from the contrast between ``" yes"`` and ``" no"``.
+        All prompts for one entity share the same context prefix, so that
+        prefix is encoded once and its KV cache is reused for every atom. Since
+        ``" yes"`` and ``" no"`` are single tokens, one forward pass yields both
+        log-probabilities, and ``loss_no - loss_yes`` reduces to
+        ``logit_yes - logit_no`` at the last prompt position.
         """
-        scored_predicates: list[ProblogAtom] = []
-        if not predicates:
-            return scored_predicates
+        atoms = [p[0] if isinstance(p, tuple) else p for p in predicates]
+        if not atoms:
+            return []
 
-        for predicate in predicates:
-            atom = predicate[0] if isinstance(predicate, tuple) else predicate
-            probability = self.prob_yes_no(atom, entity)
-            scored_predicates.append(
-                ProblogAtom(
-                    atom=atom.atom,
-                    probability=probability,
-                    context=atom.context,
+        yes_id = self._answer_token_id(self.positive_continuation)
+        no_id = self._answer_token_id(self.negative_continuation)
+        prompts = [
+            self.tokenizer(self._build_answer_prefix(atom, entity))["input_ids"]
+            for atom in atoms
+        ]
+        # Longest shared token prefix, leaving at least one token per atom.
+        shared = min(len(ids) for ids in prompts) - 1
+        for ids in prompts[1:]:
+            shared = next((i for i in range(shared) if ids[i] != prompts[0][i]), shared)
+
+        model_device = next(self.model.parameters()).device
+        temperature = max(1e-8, float(self.contrastive_temperature))
+        cache = DynamicCache()
+        scored_predicates: list[ProblogAtom] = []
+        with torch.no_grad():
+            if shared > 0:
+                self.model(
+                    input_ids=torch.tensor([prompts[0][:shared]], device=model_device),
+                    past_key_values=cache,
+                    use_cache=True,
+                    logits_to_keep=1,
                 )
-            )
+            for atom, ids in zip(atoms, prompts):
+                logits = self.model(
+                    input_ids=torch.tensor([ids[shared:]], device=model_device),
+                    past_key_values=cache,
+                    use_cache=True,
+                    logits_to_keep=1,
+                ).logits[0, -1]
+                cache.crop(shared)
+                delta = float(logits[yes_id] - logits[no_id]) / temperature
+                scored_predicates.append(
+                    ProblogAtom(
+                        atom=atom.atom,
+                        probability=1.0 / (1.0 + math.exp(-delta)),
+                        context=atom.context,
+                    )
+                )
         return scored_predicates
