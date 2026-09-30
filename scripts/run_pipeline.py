@@ -17,6 +17,7 @@ from pathlib import Path
 
 # Using Python 3.12 native generic types: `list`, `dict`, `tuple`, `| None`
 from llm_bayesian_reasoning.pipeline.config import (
+    PAIRED_ESTIMATOR_TYPES,
     EstimatorConfig,
     EstimatorType,
     LogicBackendType,
@@ -82,7 +83,7 @@ def _load_preprocessed(
                 else None
             )
             atoms_objs: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]
-            if estimator_type == EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE:
+            if estimator_type in PAIRED_ESTIMATOR_TYPES:
                 negated_atoms_text = [
                     atom for atom in negated_atoms_raw if isinstance(atom, str)
                 ]

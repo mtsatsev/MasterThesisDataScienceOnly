@@ -20,6 +20,7 @@ from llm_bayesian_reasoning.estimators.factory import (
     load_model_and_tokenizer_from_config,
 )
 from llm_bayesian_reasoning.pipeline.config import (
+    PAIRED_ESTIMATOR_TYPES,
     EstimatorType,
     ExperimentSuiteConfig,
     ExperimentVariantConfig,
@@ -27,6 +28,7 @@ from llm_bayesian_reasoning.pipeline.config import (
 )
 from llm_bayesian_reasoning.pipeline.metrics import compute_metrics
 from llm_bayesian_reasoning.pipeline.pipeline import (
+    CONTENT_FREE_KEY,
     build_record_result,
     create_logic_backend,
     score_candidate_documents,
@@ -137,7 +139,7 @@ def _build_variant_atoms(
             for atom in negated_atoms
         ]
 
-    if estimator_type == EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE:
+    if estimator_type in PAIRED_ESTIMATOR_TYPES:
         if not negated_atoms:
             raise ValueError(
                 "Contrastive variants require parsed.negated_atoms in the dataset"
@@ -552,7 +554,10 @@ def main() -> None:
                             )
                             record_result["atom_scores"] = {
                                 entity: atom_scores[entity]
-                                for entity in record_result["ranked_entities"]
+                                for entity in [
+                                    *record_result["ranked_entities"],
+                                    CONTENT_FREE_KEY,
+                                ]
                             }
                             variant_state = variant_states[variant.name]
                             variant_state["results"][record_id] = record_result

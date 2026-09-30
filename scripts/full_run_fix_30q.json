@@ -1,5 +1,5 @@
 {
-  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test_with_negs.jsonl",
+  "data_file": "llm_bayesian_reasoning/data/preprocessed_data/parsed_test_with_negs_seed7_k30.jsonl",
   "results_root": "llm_bayesian_reasoning/results",
   "retrieval_cache_dir": "llm_bayesian_reasoning/data/retrieval_cache",
   "use_metadata_ground_truth": true,

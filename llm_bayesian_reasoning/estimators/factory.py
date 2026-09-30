@@ -7,6 +7,7 @@ from transformers import (
     PreTrainedTokenizerBase,
 )
 
+from llm_bayesian_reasoning.estimators import alternative_estimators as alt
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.deep_problog_estimator import (
     DeepProbLogEstimator,
@@ -24,6 +25,15 @@ from llm_bayesian_reasoning.estimators.true_false_lm_estimator import (
     TrueFalseLLMEstimator,
 )
 from llm_bayesian_reasoning.pipeline.config import EstimatorConfig, EstimatorType
+
+_ALTERNATIVE_ESTIMATORS: dict[EstimatorType, type[BaseEstimator]] = {
+    EstimatorType.PMI_EVIDENCE_GAIN: alt.PMIEvidenceGainEstimator,
+    EstimatorType.CHANNEL_BAYES_FACTOR: alt.ChannelBayesFactorEstimator,
+    EstimatorType.EXPECTED_VERBALIZED: alt.ExpectedVerbalizedEstimator,
+    EstimatorType.THREE_WAY: alt.ThreeWayEstimator,
+    EstimatorType.NEGATION_CONSISTENT_YES_NO: alt.NegationConsistentYesNoEstimator,
+    EstimatorType.ENTITY_LIKELIHOOD_PMI: alt.EntityLikelihoodPMIEstimator,
+}
 
 
 def _common_model_kwargs(estimator_config: EstimatorConfig) -> dict[str, Any]:
@@ -83,6 +93,14 @@ def create_estimator_from_components(
 
     if etype == EstimatorType.LIKELIHOOD_BASED_YES_NO:
         return LikelihoodBasedYesNoEstimator(
+            model=model,
+            tokenizer=tokenizer,
+            device=estimator_config.device,
+            contrastive_temperature=estimator_config.contrastive_temperature,
+        )
+
+    if etype in _ALTERNATIVE_ESTIMATORS:
+        return _ALTERNATIVE_ESTIMATORS[etype](
             model=model,
             tokenizer=tokenizer,
             device=estimator_config.device,

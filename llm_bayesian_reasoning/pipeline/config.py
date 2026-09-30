@@ -37,6 +37,22 @@ class EstimatorType(str, Enum):
     LIKELIHOOD_BASED_YES_NO = "YesNoContinuation"
     DEEP_PROBLOG = "DeepProbLog"
     DPL_PIPELINE = "DPLPipeline"
+    PMI_EVIDENCE_GAIN = "PMIEvidenceGain"
+    CHANNEL_BAYES_FACTOR = "ChannelBayesFactor"
+    EXPECTED_VERBALIZED = "ExpectedVerbalized"
+    THREE_WAY = "ThreeWay"
+    NEGATION_CONSISTENT_YES_NO = "NegationConsistentYesNo"
+    ENTITY_LIKELIHOOD_PMI = "EntityLikelihoodPMI"
+
+
+# Estimators that score (atom, negated_atom) pairs instead of single atoms.
+PAIRED_ESTIMATOR_TYPES = frozenset(
+    {
+        EstimatorType.LIKELIHOOD_BASED_CONTRASTIVE,
+        EstimatorType.CHANNEL_BAYES_FACTOR,
+        EstimatorType.NEGATION_CONSISTENT_YES_NO,
+    }
+)
 
 
 class LogicBackendType(str, Enum):
@@ -85,7 +101,6 @@ class EstimatorConfig(BaseModel):
     )
     contrastive_temperature: float = Field(
         default=1.0,
-        le=1.0,
         ge=0.0,
         description="Temperature for contrastive estimation",
     )

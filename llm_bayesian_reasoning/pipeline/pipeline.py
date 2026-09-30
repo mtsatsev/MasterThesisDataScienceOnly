@@ -31,6 +31,11 @@ from llm_bayesian_reasoning.retrievers.factory import build_or_load_retriever
 
 logger = logging.getLogger(__name__)
 
+# Key in ``atom_scores`` holding each atom scored on a content-free input
+# ("N/A" entity and context), used for contextual calibration (Zhao et al., 2021).
+CONTENT_FREE_KEY = "__content_free__"
+CONTENT_FREE_INPUT = "N/A"
+
 
 def create_logic_backend(backend_type: LogicBackendType) -> LogicBackend:
     if backend_type == LogicBackendType.PROBLOG:
@@ -153,7 +158,8 @@ def score_candidate_documents(
     """Score an ordered candidate pool for a single record.
 
     If ``atom_scores`` is given, it is filled with the per-atom probabilities
-    of each entity so logic and calibration can be replayed offline.
+    of each entity, plus the content-free prior under ``CONTENT_FREE_KEY``, so
+    logic and calibration can be replayed offline.
     """
     entity_scores: dict[str, float] = {}
     for document in candidate_documents:
@@ -178,6 +184,14 @@ def score_candidate_documents(
         if atom_scores is not None:
             atom_scores[entity] = {a.atom: a.probability for a in scored_atoms}
         logger.debug("  entity=%r  prob=%.4f", entity, probability)
+    if atom_scores is not None:
+        prior_atoms = atoms
+        if include_retrieved_text:
+            prior_atoms = _clone_atoms_with_document_context(atoms, CONTENT_FREE_INPUT)
+        atom_scores[CONTENT_FREE_KEY] = {
+            a.atom: a.probability
+            for a in estimator.score_probability(prior_atoms, CONTENT_FREE_INPUT)
+        }
     return entity_scores
 
 
