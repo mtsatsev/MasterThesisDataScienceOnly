@@ -1,6 +1,8 @@
 import unittest
 from typing import Any
 
+from pydantic import ValidationError
+
 from llm_bayesian_reasoning.records.atoms import Atom
 from llm_bayesian_reasoning.records.prepare import RecordRepair, prepare_record
 from llm_bayesian_reasoning.records.query_record import QueryRecord
@@ -28,6 +30,51 @@ def raw_record() -> dict[str, Any]:
             "relevance_ratings": {"Invariances": ["Definitely relevant"]},
         },
     }
+
+
+class TestRecordRepair(unittest.TestCase):
+    def test_when_only_the_query_text_is_given_then_atoms_stay_unset(self):
+        repair = RecordRepair(logical_query="({X} is a book)")
+
+        self.assertEqual(
+            (repair.logical_query, repair.atoms, repair.negated_atoms),
+            ("({X} is a book)", None, None),
+        )
+
+    def test_when_only_atoms_and_negated_atoms_are_given_then_query_text_stays_unset(
+        self,
+    ):
+        repair = RecordRepair(
+            atoms=["{X} is a book"], negated_atoms=["{X} is not a book"]
+        )
+
+        self.assertEqual(
+            (repair.logical_query, repair.atoms, repair.negated_atoms),
+            (None, ["{X} is a book"], ["{X} is not a book"]),
+        )
+
+    def test_when_atoms_are_given_without_negated_atoms_then_error_names_the_field(
+        self,
+    ):
+        with self.assertRaisesRegex(ValidationError, "negated_atoms"):
+            RecordRepair(logical_query="({X} is a book)", atoms=["{X} is a book"])
+
+    def test_when_negated_atoms_are_given_without_atoms_then_error_names_the_field(
+        self,
+    ):
+        with self.assertRaisesRegex(ValidationError, "needs atoms"):
+            RecordRepair(
+                logical_query="({X} is a book)",
+                negated_atoms=["{X} is not a book"],
+            )
+
+    def test_when_nothing_is_given_then_error_says_the_repair_changes_nothing(self):
+        with self.assertRaisesRegex(ValidationError, "changes nothing"):
+            RecordRepair()
+
+    def test_when_an_unknown_field_is_given_then_error_names_the_field(self):
+        with self.assertRaisesRegex(ValidationError, "reason"):
+            RecordRepair(logical_query="({X} is a book)", reason="typo")
 
 
 class TestPrepareRecord(unittest.TestCase):
@@ -139,6 +186,21 @@ class TestPrepareRecord(unittest.TestCase):
                 ("{X} is a tome", "{X} is not a tome"),
                 ("{X} is short", "{X} is not short"),
             ],
+        )
+
+    def test_when_repair_replaces_only_the_atoms_then_formula_comes_from_the_raw_query(
+        self,
+    ):
+        repair = RecordRepair(
+            atoms=["{x} is a book", "{x} is written by Robert Nozick"],
+            negated_atoms=["{X} is no book", "{X} is not by Robert Nozick"],
+        )
+
+        record = prepare_record(raw_record(), RELEVANT_ENTITIES, {664: repair})
+
+        self.assertEqual(
+            (record.formula, record.atoms[0].negated_text),
+            ("((a0) , (a1))", "{X} is no book"),
         )
 
     def test_when_repair_belongs_to_another_query_then_record_is_unchanged(self):
