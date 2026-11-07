@@ -1,6 +1,9 @@
+import re
 import unittest
 
+from problog.engine import UnknownClause
 from problog.logic import Term
+from problog.parser import ParseError
 from problog.program import SimpleProgram
 
 from llm_bayesian_reasoning.logic.formula import (
@@ -56,6 +59,59 @@ class TestEvaluateFormula(unittest.TestCase):
         probability = evaluate_formula("a", {"a": 1.0})
 
         self.assertAlmostEqual(probability, 1.0)
+
+
+class TestEvaluateFormulaErrorReporting(unittest.TestCase):
+    def test_when_formula_references_unscored_atom_then_error_names_that_atom(self):
+        with self.assertRaisesRegex(ValueError, "unscored atom 'missing_atom'"):
+            evaluate_formula("scored_atom, missing_atom", {"scored_atom": 0.5})
+
+    def test_when_formula_references_unscored_atom_then_error_quotes_the_formula(self):
+        formula = "scored_atom, missing_atom"
+
+        with self.assertRaisesRegex(ValueError, re.escape(formula)):
+            evaluate_formula(formula, {"scored_atom": 0.5})
+
+    def test_when_formula_references_unscored_atom_then_problog_error_is_the_cause(
+        self,
+    ):
+        with self.assertRaises(ValueError) as caught:
+            evaluate_formula("scored_atom, missing_atom", {"scored_atom": 0.5})
+
+        self.assertIsInstance(caught.exception.__cause__, UnknownClause)
+
+    def test_when_atom_probability_is_outside_unit_interval_then_error_names_atom_and_value(
+        self,
+    ):
+        for invalid_probability in (-0.1, 1.5):
+            with self.subTest(probability=invalid_probability):
+                expected = f"'bad_atom'.*{re.escape(str(invalid_probability))}"
+
+                with self.assertRaisesRegex(ValueError, expected):
+                    evaluate_formula("bad_atom", {"bad_atom": invalid_probability})
+
+    def test_when_one_atom_probability_is_invalid_then_error_does_not_blame_valid_atoms(
+        self,
+    ):
+        with self.assertRaises(ValueError) as caught:
+            evaluate_formula(
+                "good_atom, bad_atom",
+                {"good_atom": 0.5, "bad_atom": 1.5},
+            )
+
+        self.assertNotIn("good_atom", str(caught.exception))
+
+    def test_when_formula_is_malformed_then_value_error_quotes_the_formula(self):
+        for formula in ("a, (b", "a b", "a,,b"):
+            with self.subTest(formula=formula):
+                with self.assertRaisesRegex(ValueError, re.escape(formula)):
+                    evaluate_formula(formula, {"a": 0.5, "b": 0.5})
+
+    def test_when_formula_is_malformed_then_problog_error_is_the_cause(self):
+        with self.assertRaises(ValueError) as caught:
+            evaluate_formula("a, (b", {"a": 0.5, "b": 0.5})
+
+        self.assertIsInstance(caught.exception.__cause__, ParseError)
 
 
 class TestBuildProblogProgram(unittest.TestCase):
