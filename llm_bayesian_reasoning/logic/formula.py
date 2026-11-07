@@ -1,6 +1,7 @@
 from problog import get_evaluatable
 from problog.engine import UnknownClause
 from problog.logic import Constant, Term
+from problog.parser import ParseError
 from problog.program import PrologString, SimpleProgram
 
 
@@ -40,15 +41,19 @@ def evaluate_formula(formula: str, atom_probabilities: dict[str, float]) -> floa
     Returns: 
         float: The probability that the formula holds.
     """
-    for probability in atom_probabilities.values():
+    for atom, probability in atom_probabilities.items():
         if not 0.0 <= probability <= 1.0:
-            raise ValueError
-
-    program = build_problog_program(formula, atom_probabilities)
+            raise ValueError(
+                f"Probability of atom {atom!r} is outside [0, 1]: {probability}"
+            )
 
     try:
+        program = build_problog_program(formula, atom_probabilities)
         result = get_evaluatable().create_from(program).evaluate()
-    except UnknownClause:
-        raise ValueError
+    except UnknownClause as error:
+        atom = str(error).split("'")[1].rsplit("/", 1)[0]
+        raise ValueError(f"Formula {formula!r} uses unscored atom {atom!r}") from error
+    except ParseError as error:
+        raise ValueError(f"Malformed formula {formula!r}: {error}") from error
 
     return next(iter(result.values()))
