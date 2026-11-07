@@ -1,7 +1,66 @@
 import unittest
 
+from pydantic import ValidationError
+
 from llm_bayesian_reasoning.records.atoms import Atom, build_atoms
 from llm_bayesian_reasoning.records.translate_formula import translate_logical_query
+
+
+class TestAtom(unittest.TestCase):
+    VALID_FIELDS = {
+        "name": "a0",
+        "text": "{X} is a film",
+        "negated_text": "{X} is not a film",
+    }
+
+    def test_when_all_fields_are_valid_then_atom_keeps_their_values(self):
+        atom = Atom(**self.VALID_FIELDS)
+
+        self.assertEqual(atom.model_dump(), self.VALID_FIELDS)
+
+    def test_when_atom_is_written_to_json_then_reading_it_back_gives_an_equal_atom(
+        self,
+    ):
+        atom = Atom(**self.VALID_FIELDS)
+
+        self.assertEqual(Atom.model_validate_json(atom.model_dump_json()), atom)
+
+    def test_when_name_has_several_digits_then_it_is_accepted(self):
+        atom = Atom(**{**self.VALID_FIELDS, "name": "a12"})
+
+        self.assertEqual(atom.name, "a12")
+
+    def test_when_name_is_not_a_generated_problog_name_then_error_names_the_field(self):
+        for name in ("", "a", "A0", "0a", "b0", "a0b", "xa0", "a 0", "a0, a1"):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValidationError, "name"):
+                    Atom(**{**self.VALID_FIELDS, "name": name})
+
+    def test_when_text_has_no_uppercase_placeholder_then_error_names_the_field(self):
+        for text in ("", "is a film", "{x} is a film"):
+            with self.subTest(text=text):
+                with self.assertRaisesRegex(ValidationError, "text"):
+                    Atom(**{**self.VALID_FIELDS, "text": text})
+
+    def test_when_negated_text_has_no_uppercase_placeholder_then_error_names_the_field(
+        self,
+    ):
+        for negated_text in ("", "is not a film", "{x} is not a film"):
+            with self.subTest(negated_text=negated_text):
+                with self.assertRaisesRegex(ValidationError, "negated_text"):
+                    Atom(**{**self.VALID_FIELDS, "negated_text": negated_text})
+
+    def test_when_a_field_is_missing_then_error_names_the_field(self):
+        for field in self.VALID_FIELDS:
+            with self.subTest(field=field):
+                fields = {k: v for k, v in self.VALID_FIELDS.items() if k != field}
+
+                with self.assertRaisesRegex(ValidationError, field):
+                    Atom(**fields)
+
+    def test_when_an_unknown_field_is_given_then_error_names_the_field(self):
+        with self.assertRaisesRegex(ValidationError, "probability"):
+            Atom(**self.VALID_FIELDS, probability=0.5)
 
 
 class TestBuildAtoms(unittest.TestCase):
