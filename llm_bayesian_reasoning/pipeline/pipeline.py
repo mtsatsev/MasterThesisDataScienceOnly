@@ -3,8 +3,6 @@ import logging
 from pathlib import Path
 from typing import Any, cast, overload
 
-import mlflow
-
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
 from llm_bayesian_reasoning.pipeline.config import PipelineConfig, RetrieverType
@@ -280,42 +278,6 @@ def run_pipeline(
     output_path = Path(config.output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Optional MLflow tracking
-    _mlflow_active = False
-    if config.mlflow_experiment is not None:
-        try:
-            mlflow.set_experiment(config.mlflow_experiment)
-            mlflow.start_run(nested=True)
-            mlflow.log_params(
-                {
-                    "top_n": config.top_n,
-                    "top_k": config.top_k,
-                    "batch_size": config.batch_size,
-                    "model_name": config.estimator_config.model_name,
-                    "device": config.estimator_config.device,
-                    "include_retrieved_text": config.estimator_config.include_retrieved_text,
-                }
-            )
-            # Tag the run with the on-disk results folder for easy lookup
-            try:
-                mlflow.set_tag("results_path", str(output_path.parent))
-            except Exception:
-                # best-effort; do not fail the run if tagging fails
-                logger.debug("Could not set mlflow tag 'results_path'")
-            _mlflow_active = True
-            logger.info(
-                "MLflow tracking enabled (experiment=%r)", config.mlflow_experiment
-            )
-        except ImportError:
-            logger.warning(
-                "mlflow is not installed; skipping tracking. pip install mlflow"
-            )
-        except Exception:  # noqa: BLE001
-            logger.warning(
-                "MLflow initialisation failed — continuing without tracking.",
-                exc_info=True,
-            )
-
     # Track already-processed ids to support resumption; reload their results
     # so that metrics can be computed over the full dataset even when resuming.
     processed_ids: set = set()
@@ -334,7 +296,6 @@ def run_pipeline(
             logger.info(
                 "Resuming: skipping %d already-processed records", len(processed_ids)
             )
-    record_step = len(processed_ids)
 
     # Instantiate estimator from config when not provided (convenience for CLI)
     if estimator is None:
@@ -405,7 +366,6 @@ def run_pipeline(
                 )
                 record_result["atom_scores"] = atom_scores
                 ranked_entities = record_result["ranked_entities"]
-                retrieved_entities = record_result["retrieved_entities"]
 
                 results[record_id] = record_result
 
@@ -418,53 +378,10 @@ def run_pipeline(
                     ranked[0][1] if ranked else 0.0,
                 )
 
-                # --- MLflow per-record logging ---
-                if _mlflow_active:
-                    try:
-                        top_score = ranked[0][1] if ranked else 0.0
-                        avg_score = (
-                            sum(entity_scores.values()) / len(entity_scores)
-                            if entity_scores
-                            else 0.0
-                        )
-                        # Step metrics for time-series charts
-                        mlflow.log_metrics(
-                            {
-                                "top_entity_score": top_score,
-                                "avg_candidate_score": avg_score,
-                                "num_candidates": len(entity_scores),
-                            },
-                            step=record_step,
-                        )
-                        top_k_entities = ranked_entities[: config.top_k]
-                        # Structured per-query table row
-                        row: dict = {
-                            "record_id": [record_id],
-                            "query": [query],
-                            "model": [config.estimator_config.model_name],
-                            "ground_truth": [
-                                ", ".join(record_result.get("ground_truth", []))
-                            ],
-                            "top_n_candidates": [", ".join(retrieved_entities)],
-                            "top_k_results": [", ".join(top_k_entities)],
-                        }
-                        for metric_name, metric_val in record_result.get(
-                            "record_metrics", {}
-                        ).items():
-                            row[metric_name] = [metric_val]
-                        mlflow.log_table(data=row, artifact_file="query_results.json")
-                    except Exception:  # noqa: BLE001
-                        logger.warning(
-                            "MLflow per-record logging failed — skipping.",
-                            exc_info=True,
-                        )
-
             except Exception:  # noqa: BLE001
                 logger.exception(
                     "Unhandled error processing record %s — skipping", record_id
                 )
-
-            record_step += 1
 
     # --- Evaluation metrics ---
     metrics: dict[str, float] = {}
@@ -481,22 +398,6 @@ def run_pipeline(
         with open(metrics_path, "w", encoding="utf-8") as mf:
             json.dump(metrics, mf, indent=2, ensure_ascii=False)
         logger.info("Metrics saved to %s", metrics_path)
-
-        if _mlflow_active:
-            try:
-                mlflow.log_metrics(metrics)
-            except Exception:  # noqa: BLE001
-                logger.warning(
-                    "MLflow metric logging failed — skipping.", exc_info=True
-                )
-
-    if _mlflow_active:
-        try:
-            mlflow.log_artifact(str(output_path))
-            mlflow.end_run()
-            logger.info("MLflow run ended. View with: mlflow ui")
-        except Exception:  # noqa: BLE001
-            logger.warning("MLflow end-run cleanup failed — skipping.", exc_info=True)
 
     return {"results": results, "metrics": metrics}
 

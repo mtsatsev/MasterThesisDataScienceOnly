@@ -178,7 +178,6 @@ def main():
     )
     p.add_argument("--device", type=str, default="cuda")
 
-    p.add_argument("--mlflow-experiment", type=str, default=None)
     p.add_argument(
         "--include-retrieved-text",
         action="store_true",
@@ -242,7 +241,6 @@ def main():
         estimator_config=estimator_cfg,
         retriever_type=RetrieverType(args.retriever_type),
         retriever_model_name=args.retriever_model_name,
-        mlflow_experiment=args.mlflow_experiment,
     )
 
     try:
@@ -277,7 +275,6 @@ def main():
                 "estimator_type": estimator_cfg.estimator_type.value,
                 "device": estimator_cfg.device,
                 "include_retrieved_text": estimator_cfg.include_retrieved_text,
-                "mlflow_experiment": args.mlflow_experiment,
             },
             cf,
             indent=2,
@@ -321,7 +318,6 @@ def main():
         estimator_config=pipe_cfg.estimator_config,
         retriever_type=pipe_cfg.retriever_type,
         retriever_model_name=pipe_cfg.retriever_model_name,
-        mlflow_experiment=args.mlflow_experiment,
     )
 
     # Run pipeline (estimator will be instantiated from config inside run_pipeline)
