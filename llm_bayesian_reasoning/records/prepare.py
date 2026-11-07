@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from llm_bayesian_reasoning.records.atoms import build_atoms
 from llm_bayesian_reasoning.records.query_record import QueryRecord
@@ -8,11 +8,24 @@ from llm_bayesian_reasoning.records.translate_formula import translate_logical_q
 
 
 class RecordRepair(BaseModel):
-    """A correction to one raw query, replacing its text and optionally its atoms."""
+    """A correction to one raw query, replacing its text, its atoms or both."""
 
-    logical_query: str
+    model_config = ConfigDict(extra="forbid")
+
+    logical_query: str | None = None
     atoms: list[str] | None = None
     negated_atoms: list[str] | None = None
+
+    @model_validator(mode="after")
+    def validate_fields(self) -> Self:
+        """Reject repairs that change nothing or give only one list of atoms."""
+        if self.atoms is not None and self.negated_atoms is None:
+            raise ValueError("Repair with atoms needs negated_atoms")
+        if self.negated_atoms is not None and self.atoms is None:
+            raise ValueError("Repair with negated_atoms needs atoms")
+        if self.logical_query is None and self.atoms is None:
+            raise ValueError("Repair changes nothing")
+        return self
 
 
 def prepare_record(
@@ -43,7 +56,8 @@ def prepare_record(
 
         repair = repairs.get(query_id)
         if repair is not None:
-            logical_query = repair.logical_query
+            if repair.logical_query is not None:
+                logical_query = repair.logical_query
             if repair.atoms is not None:
                 atom_texts = repair.atoms
                 negated_texts = repair.negated_atoms
