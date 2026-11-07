@@ -1,9 +1,12 @@
 from problog import get_evaluatable
 from problog.engine import UnknownClause
-from problog.program import PrologString
+from problog.logic import Constant, Term
+from problog.program import PrologString, SimpleProgram
 
 
-def build_problog_program(formula: str, atom_probabilities: dict[str, float]) -> str:
+def build_problog_program(
+    formula: str, atom_probabilities: dict[str, float]
+) -> SimpleProgram:
     """
     Return the ProbLog program that queries a formula over probabilistic atoms.
 
@@ -14,12 +17,14 @@ def build_problog_program(formula: str, atom_probabilities: dict[str, float]) ->
             A dictionary mapping atom names to their probabilities.
 
     Returns:
-        str: The program text: one fact per atom, the rule and the query.
+        SimpleProgram: One fact per atom, followed by the rule and the query.
     """
-    facts = "\n".join(
-        f"{probability}::{atom}." for atom, probability in atom_probabilities.items()
-    )
-    return f"{facts}\nformula_holds :- {formula}.\nquery(formula_holds)."
+    program = SimpleProgram()
+    for atom, probability in atom_probabilities.items():
+        program += Term(atom, p=Constant(probability))
+    for statement in PrologString(f"formula_holds :- {formula}.\nquery(formula_holds)."):
+        program += statement
+    return program
 
 
 def evaluate_formula(formula: str, atom_probabilities: dict[str, float]) -> float:
@@ -42,7 +47,7 @@ def evaluate_formula(formula: str, atom_probabilities: dict[str, float]) -> floa
     program = build_problog_program(formula, atom_probabilities)
 
     try:
-        result = get_evaluatable().create_from(PrologString(program)).evaluate()
+        result = get_evaluatable().create_from(program).evaluate()
     except UnknownClause:
         raise ValueError
 
