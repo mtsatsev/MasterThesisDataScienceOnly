@@ -133,3 +133,37 @@ class TestTranslateLogicalQuery(unittest.TestCase):
         probability = evaluate_formula(formula, {"a0": 0.5, "a1": 0.8})
 
         self.assertAlmostEqual(probability, 0.4)
+
+
+class TestTranslateLogicalQueryErrorReporting(unittest.TestCase):
+    def test_when_query_uses_text_that_is_not_an_atom_then_error_names_that_text(self):
+        unknown = "{X} is from 2012"
+
+        with self.assertRaisesRegex(ValueError, f"not an atom: '{re.escape(unknown)}'"):
+            translate_logical_query(f"(({FILM}) AND ({unknown}))", NAMES)
+
+    def test_when_query_extends_an_atom_with_more_words_then_error_names_the_extra_words(
+        self,
+    ):
+        with self.assertRaisesRegex(ValueError, "not an atom: 'noir'"):
+            translate_logical_query("({X} is a film noir)", NAMES)
+
+    def test_when_atoms_are_joined_by_an_unknown_word_then_error_names_that_word(self):
+        for word in ("BUT", "and", "or", "not"):
+            with self.subTest(word=word):
+                with self.assertRaisesRegex(ValueError, f"not an atom: '{word}'"):
+                    translate_logical_query(f"(({FILM}) {word} ({BOOK}))", NAMES)
+
+    def test_when_query_has_an_extra_closing_bracket_then_error_is_raised(self):
+        with self.assertRaisesRegex(ValueError, "bracket"):
+            translate_logical_query(f"(({FILM})))", NAMES)
+
+    def test_when_query_is_empty_then_error_is_raised(self):
+        with self.assertRaisesRegex(ValueError, "empty"):
+            translate_logical_query("", NAMES)
+
+    def test_when_translation_fails_then_error_quotes_the_whole_query(self):
+        query = f"(({FILM}) AND ({{X}} is from 2012))"
+
+        with self.assertRaisesRegex(ValueError, re.escape(query)):
+            translate_logical_query(query, NAMES)
