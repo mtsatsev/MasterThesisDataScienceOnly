@@ -116,9 +116,17 @@ class TestBuildAtoms(unittest.TestCase):
 
         self.assertEqual(formula, "((a0) , (a1) , (a0))")
 
-    def test_when_atom_and_negated_counts_differ_then_error_reports_both_counts(self):
+    def test_when_there_are_more_atoms_than_negated_texts_then_error_reports_both_counts(
+        self,
+    ):
         with self.assertRaisesRegex(ValueError, "2 atoms but 1 negated"):
             build_atoms(["{X} is a film", "{X} is a book"], ["{X} is not a film"])
+
+    def test_when_there_are_more_negated_texts_than_atoms_then_error_reports_both_counts(
+        self,
+    ):
+        with self.assertRaisesRegex(ValueError, "1 atoms but 2 negated"):
+            build_atoms(["{X} is a film"], ["{X} is not a film", "{X} is not a book"])
 
     def test_when_no_atoms_are_given_then_error_is_raised(self):
         with self.assertRaisesRegex(ValueError, "no atoms"):
