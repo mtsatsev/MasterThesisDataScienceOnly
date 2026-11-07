@@ -7,3 +7,10 @@
 poetry.lock
 __pycache__/
 *.pyc
+llm_bayesian_reasoning/data/*
+llm_bayesian_reasoning/discussions/*
+docs/*
+index/*
+llm_bayesian_reasoning/results/*
+.claude/*
+.vscode/*
