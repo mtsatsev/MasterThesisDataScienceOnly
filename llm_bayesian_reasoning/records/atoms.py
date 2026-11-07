@@ -1,12 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Atom(BaseModel):
     """A query condition with its ProbLog name and its two prompt texts."""
 
-    name: str
-    text: str
-    negated_text: str
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(pattern=r"^a[0-9]+$")
+    text: str = Field(pattern=r"\{X\}")
+    negated_text: str = Field(pattern=r"\{X\}")
 
 
 def build_atoms(atom_texts: list[str], negated_texts: list[str]) -> list[Atom]:
