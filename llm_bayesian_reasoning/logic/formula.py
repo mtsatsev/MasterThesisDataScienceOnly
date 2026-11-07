@@ -23,7 +23,9 @@ def build_problog_program(
     program = SimpleProgram()
     for atom, probability in atom_probabilities.items():
         program += Term(atom, p=Constant(probability))
-    for statement in PrologString(f"formula_holds :- {formula}.\nquery(formula_holds)."):
+    for statement in PrologString(
+        f"formula_holds :- {formula}.\nquery(formula_holds)."
+    ):
         program += statement
     return program
 
@@ -31,14 +33,14 @@ def build_problog_program(
 def evaluate_formula(formula: str, atom_probabilities: dict[str, float]) -> float:
     """
     Return the probability that a ProbLog formula holds.
-    
+
     Args:
         formula (str):
             The ProbLog formula to evaluate.
         atom_probabilities (dict[str, float]):
             A dictionary mapping atom names to their probabilities.
 
-    Returns: 
+    Returns:
         float: The probability that the formula holds.
     """
     for atom, probability in atom_probabilities.items():

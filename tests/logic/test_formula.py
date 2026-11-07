@@ -99,27 +99,21 @@ class TestEvaluateFormulaDatasetShapes(unittest.TestCase):
     def test_when_conjunction_excludes_two_atoms_then_both_complements_are_multiplied(
         self,
     ):
-        probability = evaluate_formula(
-            "a, \\+b, \\+c", {"a": 0.5, "b": 0.8, "c": 0.5}
-        )
+        probability = evaluate_formula("a, \\+b, \\+c", {"a": 0.5, "b": 0.8, "c": 0.5})
 
         self.assertAlmostEqual(probability, 0.05)
 
     def test_when_conjunction_excludes_a_conjunction_then_group_complement_is_used(
         self,
     ):
-        probability = evaluate_formula(
-            "a, \\+(b, c)", {"a": 0.5, "b": 0.8, "c": 0.5}
-        )
+        probability = evaluate_formula("a, \\+(b, c)", {"a": 0.5, "b": 0.8, "c": 0.5})
 
         self.assertAlmostEqual(probability, 0.3)
 
     def test_when_conjunction_excludes_a_disjunction_then_group_complement_is_used(
         self,
     ):
-        probability = evaluate_formula(
-            "a, \\+(b; c)", {"a": 0.5, "b": 0.8, "c": 0.5}
-        )
+        probability = evaluate_formula("a, \\+(b; c)", {"a": 0.5, "b": 0.8, "c": 0.5})
 
         self.assertAlmostEqual(probability, 0.05)
 
@@ -138,9 +132,7 @@ class TestEvaluateFormulaDatasetShapes(unittest.TestCase):
         self.assertAlmostEqual(probability, 0.7)
 
     def test_when_disjoined_conjunctions_share_an_atom_then_it_is_counted_once(self):
-        probability = evaluate_formula(
-            "(a, b); (a, c)", {"a": 0.5, "b": 0.8, "c": 0.5}
-        )
+        probability = evaluate_formula("(a, b); (a, c)", {"a": 0.5, "b": 0.8, "c": 0.5})
 
         self.assertAlmostEqual(probability, 0.45)
 
@@ -156,9 +148,7 @@ class TestEvaluateFormulaDatasetShapes(unittest.TestCase):
     def test_when_disjunct_contains_a_negation_then_it_applies_only_to_that_disjunct(
         self,
     ):
-        probability = evaluate_formula(
-            "a; (b, \\+c)", {"a": 0.5, "b": 0.8, "c": 0.5}
-        )
+        probability = evaluate_formula("a; (b, \\+c)", {"a": 0.5, "b": 0.8, "c": 0.5})
 
         self.assertAlmostEqual(probability, 0.7)
 
