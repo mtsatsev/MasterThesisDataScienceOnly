@@ -1,0 +1,1646 @@
+{
+ "2": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a German film",
+   "{X} is a spy film",
+   "{X} is a comedy film",
+   "{X} is a comedy-drama film",
+   "{X} is a mystery film",
+   "{X} is from the 2000s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a German film",
+   "{X} is not a spy film",
+   "{X} is not a comedy film",
+   "{X} is not a comedy-drama film",
+   "{X} is not a mystery film",
+   "{X} is not from the 2000s"
+  ]
+ },
+ "4": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a comedy film",
+   "{X} is a mystery film",
+   "{X} is a spy film",
+   "{X} is from the 1950s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a comedy film",
+   "{X} is not a mystery film",
+   "{X} is not a spy film",
+   "{X} is not from the 1950s"
+  ]
+ },
+ "23": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a French film",
+   "{X} is a sci-fi film",
+   "{X} is a thriller film",
+   "{X} is from the 1960s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a French film",
+   "{X} is not a sci-fi film",
+   "{X} is not a thriller film",
+   "{X} is not from the 1960s"
+  ]
+ },
+ "27": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a satirical film",
+   "{X} is a television film",
+   "{X} is from Austria"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a satirical film",
+   "{X} is not a television film",
+   "{X} is not from Austria"
+  ]
+ },
+ "40": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a 3D film",
+   "{X} is a horror film",
+   "{X} is from the 1900s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a 3D film",
+   "{X} is not a horror film",
+   "{X} is not from the 1900s"
+  ]
+ },
+ "42": {
+  "logical_query": "((({X} is a film) AND ({X} is set in Riga)) OR (({X} is a film) AND ({X} is a Greek film) AND ({X} is a biographical film) AND ({X} is a drama film)))"
+ },
+ "44": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a comedy film",
+   "{X} is a mystery film",
+   "{X} is a spy film",
+   "{X} is from the 2020s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a comedy film",
+   "{X} is not a mystery film",
+   "{X} is not a spy film",
+   "{X} is not from the 2020s"
+  ]
+ },
+ "62": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a horror film",
+   "{X} is a drama film",
+   "{X} is from the 2000s",
+   "{X} is a Karel Jaromír Erben film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a horror film",
+   "{X} is not a drama film",
+   "{X} is not from the 2000s",
+   "{X} is not a Karel Jaromír Erben film"
+  ]
+ },
+ "89": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a silent film",
+   "{X} is a drama film",
+   "{X} is a lost film",
+   "{X} is from 1910"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a silent film",
+   "{X} is not a drama film",
+   "{X} is not a lost film",
+   "{X} is not from 1910"
+  ]
+ },
+ "103": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a crime film",
+   "{X} is a comedy film",
+   "{X} is from 1940",
+   "{X} is an American crime film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a crime film",
+   "{X} is not a comedy film",
+   "{X} is not from 1940",
+   "{X} is not an American crime film"
+  ]
+ },
+ "108": {
+  "logical_query": "(({X} is a film) AND ({X} is a Hong Kong film) AND ({X} is a supernatural film) AND (NOT({X} is based on folklore)))"
+ },
+ "124": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a sports film",
+   "{X} is a comedy film",
+   "{X} is from the 1990s",
+   "{X} is an American film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a sports film",
+   "{X} is not a comedy film",
+   "{X} is not from the 1990s",
+   "{X} is not an American film"
+  ]
+ },
+ "127": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a war film",
+   "{X} is a drama film",
+   "{X} is from the 1910s",
+   "{X} is an American film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a war film",
+   "{X} is not a drama film",
+   "{X} is not from the 1910s",
+   "{X} is not an American film"
+  ]
+ },
+ "128": {
+  "logical_query": "(({X} is a film) AND ({X} is a Belgian film) AND ({X} is a comedy film) AND ({X} is a drama film) AND (NOT({X} is a French film)))",
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Belgian film",
+   "{X} is a comedy film",
+   "{X} is a drama film",
+   "{X} is a French film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Belgian film",
+   "{X} is not a comedy film",
+   "{X} is not a drama film",
+   "{X} is not a French film"
+  ]
+ },
+ "136": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a documentary film",
+   "{X} is a Danish film",
+   "{X} is from 2016"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a documentary film",
+   "{X} is not a Danish film",
+   "{X} is not from 2016"
+  ]
+ },
+ "148": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a legal film",
+   "{X} is a mystery film",
+   "{X} is a drama film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a legal film",
+   "{X} is not a mystery film",
+   "{X} is not a drama film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "164": {
+  "logical_query": "(({X} is a film) AND ({X} is a World War II film) AND (({X} is an adventure film) AND ({X} is a spy film)) AND ({X} is from the 1940s))",
+  "atoms": [
+   "{X} is a film",
+   "{X} is a World War II film",
+   "{X} is an adventure film",
+   "{X} is a spy film",
+   "{X} is from the 1940s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a World War II film",
+   "{X} is not an adventure film",
+   "{X} is not a spy film",
+   "{X} is not from the 1940s"
+  ]
+ },
+ "178": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a supernatural film",
+   "{X} is a western film",
+   "{X} is a horror film",
+   "{X} is from the 1990s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a supernatural film",
+   "{X} is not a western film",
+   "{X} is not a horror film",
+   "{X} is not from the 1990s"
+  ]
+ },
+ "179": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a romantic film",
+   "{X} is a drama film",
+   "{X} is from the 1960s",
+   "{X} is an English-language film",
+   "{X} is a Canadian film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a romantic film",
+   "{X} is not a drama film",
+   "{X} is not from the 1960s",
+   "{X} is not an English-language film",
+   "{X} is not a Canadian film"
+  ]
+ },
+ "183": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an American film",
+   "{X} is an action film",
+   "{X} is a comedy film",
+   "{X} is from the year 2000"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an American film",
+   "{X} is not an action film",
+   "{X} is not a comedy film",
+   "{X} is not from the year 2000"
+  ]
+ },
+ "184": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an erotic film",
+   "{X} is a romantic film",
+   "{X} is a thriller film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an erotic film",
+   "{X} is not a romantic film",
+   "{X} is not a thriller film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "186": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a political film",
+   "{X} is a drama film",
+   "{X} is from 1987"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a political film",
+   "{X} is not a drama film",
+   "{X} is not from 1987"
+  ]
+ },
+ "189": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an American film",
+   "{X} is a children's film",
+   "{X} is a fantasy film",
+   "{X} is a musical film",
+   "{X} is from the 1930s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an American film",
+   "{X} is not a children's film",
+   "{X} is not a fantasy film",
+   "{X} is not a musical film",
+   "{X} is not from the 1930s"
+  ]
+ },
+ "196": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an American film",
+   "{X} is a silent film",
+   "{X} is a short film",
+   "{X} is from the 2000s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an American film",
+   "{X} is not a silent film",
+   "{X} is not a short film",
+   "{X} is not from the 2000s"
+  ]
+ },
+ "200": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Family film",
+   "{X} is a Romance film",
+   "{X} is from 2021"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Family film",
+   "{X} is not a Romance film",
+   "{X} is not from 2021"
+  ]
+ },
+ "215": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a comedy film",
+   "{X} is a political film",
+   "{X} is from the 1940s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a comedy film",
+   "{X} is not a political film",
+   "{X} is not from the 1940s"
+  ]
+ },
+ "220": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a sports film",
+   "{X} is a comedy film",
+   "{X} is from Sweden"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a sports film",
+   "{X} is not a comedy film",
+   "{X} is not from Sweden"
+  ]
+ },
+ "221": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a fantasy film",
+   "{X} is from 2016"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a fantasy film",
+   "{X} is not from 2016"
+  ]
+ },
+ "225": {
+  "logical_query": "(({X} is a film) AND ({X} is a Hong Kong film) AND (({X} is a horror film) AND ({X} is a thriller film)))"
+ },
+ "233": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a comedy film",
+   "{X} is a thriller film",
+   "{X} is from the 1970s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a comedy film",
+   "{X} is not a thriller film",
+   "{X} is not from the 1970s"
+  ]
+ },
+ "238": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a mystery film",
+   "{X} is a comedy film",
+   "{X} is a drama film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a mystery film",
+   "{X} is not a comedy film",
+   "{X} is not a drama film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "239": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Western film",
+   "{X} is from 2006"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Western film",
+   "{X} is not from 2006"
+  ]
+ },
+ "242": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a romantic comedy film",
+   "{X} is from 1925"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a romantic comedy film",
+   "{X} is not from 1925"
+  ]
+ },
+ "243": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a thriller film",
+   "{X} is from 1938"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a thriller film",
+   "{X} is not from 1938"
+  ]
+ },
+ "255": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a comedy film",
+   "{X} is a drama film",
+   "{X} is a political film",
+   "{X} is from the 1930s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a comedy film",
+   "{X} is not a drama film",
+   "{X} is not a political film",
+   "{X} is not from the 1930s"
+  ]
+ },
+ "259": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Sci-fi film",
+   "{X} is from 2001"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Sci-fi film",
+   "{X} is not from 2001"
+  ]
+ },
+ "279": {
+  "logical_query": "(({X} is a film) AND (({X} is a West German film) AND ({X} is a French film)) AND ({X} is a sci-fi film))"
+ },
+ "286": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a remake of an Indian film",
+   "{X} is a sequel",
+   "{X} is a Telugu film",
+   "{X} is remade in other languages"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a remake of an Indian film",
+   "{X} is not a sequel",
+   "{X} is not a Telugu film",
+   "{X} is not remade in other languages"
+  ]
+ },
+ "289": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Brazilian film",
+   "{X} is a teen film",
+   "{X} is a comedy film",
+   "{X} is a drama film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Brazilian film",
+   "{X} is not a teen film",
+   "{X} is not a comedy film",
+   "{X} is not a drama film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "291": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a children's film",
+   "{X} is a buddy film",
+   "{X} is a fantasy film",
+   "{X} is about rodents",
+   "{X} is from the 2000s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a children's film",
+   "{X} is not a buddy film",
+   "{X} is not a fantasy film",
+   "{X} is not about rodents",
+   "{X} is not from the 2000s"
+  ]
+ },
+ "292": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an Indian film",
+   "{X} is a folklore film",
+   "{X} is a romance film",
+   "{X} is from the 1990s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an Indian film",
+   "{X} is not a folklore film",
+   "{X} is not a romance film",
+   "{X} is not from the 1990s"
+  ]
+ },
+ "295": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an Iranian film",
+   "{X} is an Asian film",
+   "{X} is a short film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an Iranian film",
+   "{X} is not an Asian film",
+   "{X} is not a short film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "297": {
+  "logical_query": "(({X} is a film) AND ({X} is an American film) AND (({X} is a Christmas film) AND ({X} is a Romance film)) AND ({X} is about sleep))"
+ },
+ "312": {
+  "logical_query": "(({X} is a film) AND ({X} is an Indian film) AND ({X} is a crime film) AND ({X} is an action film) AND (({X} is from the 1990s) AND ({X} is from 1999)))"
+ },
+ "313": {
+  "logical_query": "(({X} is a film) AND ({X} is a British film) AND ({X} is a comedy film) AND (({X} includes orphans) AND ({X} includes child abuse)))"
+ },
+ "314": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an action film",
+   "{X} is a horror film",
+   "{X} is from the 2010s",
+   "{X} is about transport",
+   "{X} is about monsters"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an action film",
+   "{X} is not a horror film",
+   "{X} is not from the 2010s",
+   "{X} is not about transport",
+   "{X} is not about monsters"
+  ]
+ },
+ "322": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Zombie film",
+   "{X} is a sci-fi film",
+   "{X} is an American film",
+   "{X} is a drama film",
+   "{X} is a comedy film",
+   "{X} is from the 2010s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Zombie film",
+   "{X} is not a sci-fi film",
+   "{X} is not an American film",
+   "{X} is not a drama film",
+   "{X} is not a comedy film",
+   "{X} is not from the 2010s"
+  ]
+ },
+ "325": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a political film",
+   "{X} is about science",
+   "{X} is about the United States Armed Forces",
+   "{X} is from the 1980s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a political film",
+   "{X} does not mention science",
+   "{X} does not mention the United States Armed Forces",
+   "{X} is not from the 1980s"
+  ]
+ },
+ "328": {
+  "logical_query": "(({X} is a film) AND ({X} is a horror film) AND (({X} is a security film) OR ({X} is a surveillance film)) AND ({X} is from 1996) AND ({X} is from the 1990s))"
+ },
+ "341": {
+  "logical_query": "(({X} is a film) AND ({X} is an American comedy film) AND ({X} is a prison film) AND (NOT({X} is an American prison film)))",
+  "atoms": [
+   "{X} is a film",
+   "{X} is a prison film",
+   "{X} is an American comedy film",
+   "{X} is an American prison film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a prison film",
+   "{X} is not an American comedy film",
+   "{X} is not an American prison film"
+  ]
+ },
+ "343": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a romance film",
+   "{X} is a Bangladeshi film",
+   "{X} is from the 2010s",
+   "{X} is a drama film"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a romance film",
+   "{X} is not a Bangladeshi film",
+   "{X} is not from the 2010s",
+   "{X} is not a drama film"
+  ]
+ },
+ "350": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a short film",
+   "{X} is a documentary film",
+   "{X} is from the 1890s",
+   "{X} is in black-and-white"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a short film",
+   "{X} is not a documentary film",
+   "{X} is not from the 1890s",
+   "{X} is not in black-and-white"
+  ]
+ },
+ "355": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Nigerian film",
+   "{X} is a romance film",
+   "{X} is from 2010",
+   "{X} involves romantic drama"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Nigerian film",
+   "{X} is not a romance film",
+   "{X} is not from 2010",
+   "{X} does not involve romantic drama"
+  ]
+ },
+ "363": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a supernatural film",
+   "{X} is a thriller film",
+   "{X} is a horror film",
+   "{X} is from the 2000s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a supernatural film",
+   "{X} is not a thriller film",
+   "{X} is not a horror film",
+   "{X} is not from the 2000s"
+  ]
+ },
+ "378": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a dark fantasy film",
+   "{X} is a horror film",
+   "{X} is from the 2000s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a dark fantasy film",
+   "{X} is not a horror film",
+   "{X} is not from the 2000s"
+  ]
+ },
+ "391": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an American film",
+   "{X} is a buddy film",
+   "{X} is an action film",
+   "{X} is a comedy film",
+   "{X} is from the 1990s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an American film",
+   "{X} is not a buddy film",
+   "{X} is not an action film",
+   "{X} is not a comedy film",
+   "{X} is not from the 1990s"
+  ]
+ },
+ "409": {
+  "logical_query": "((({X} is a film) AND ({X} is a Hungarian film) AND ({X} is a WWII film)) OR (({X} is a film) AND ({X} is a Biographical drama film)) OR (({X} is a film) AND ({X} is a Romanian film) AND ({X} is a historical drama film)))"
+ },
+ "429": {
+  "logical_query": "((({X} is a film) AND ({X} is a horror film) AND ({X} is a drama film) AND ({X} is from the 1990s)) OR (({X} is a film) AND ({X} is a Polish film) AND ({X} is an avant-garde film) AND ({X} is an experimental film)) OR (({X} is a film) AND ({X} is a Polish film) AND ({X} is an animated film) AND ({X} is a science fiction film)))"
+ },
+ "438": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is a Russian film",
+   "{X} is a Superhero film",
+   "{X} is a crime film",
+   "{X} is an action film",
+   "{X} is a science fiction film",
+   "{X} is an adventure film",
+   "{X} is from the 2020s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not a Russian film",
+   "{X} is not a Superhero film",
+   "{X} is not a crime film",
+   "{X} is not an action film",
+   "{X} is not a science fiction film",
+   "{X} is not an adventure film",
+   "{X} is not from the 2020s"
+  ]
+ },
+ "450": {
+  "atoms": [
+   "{X} is a film",
+   "{X} is an American film",
+   "{X} is a French film",
+   "{X} is a historical film",
+   "{X} is a fantasy film",
+   "{X} is from the 1950s"
+  ],
+  "negated_atoms": [
+   "{X} is not a film",
+   "{X} is not an American film",
+   "{X} is not a French film",
+   "{X} is not a historical film",
+   "{X} is not a fantasy film",
+   "{X} is not from the 1950s"
+  ]
+ },
+ "460": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a British novel",
+   "{X} is a science fiction novel",
+   "{X} is from 1914"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a British novel",
+   "{X} is not a science fiction novel",
+   "{X} is not from 1914"
+  ]
+ },
+ "469": {
+  "logical_query": "((({X} is a novel) AND ({X} is a French novel) AND ({X} is from 1947)) OR (({X} is a novel) AND ({X} is written by Jean-Paul Sartre)))"
+ },
+ "482": {
+  "logical_query": "((({X} is a novel) AND ({X} is a Chinese novel) AND ({X} is from 2005)) OR (({X} is a novel) AND ({X} is a Chinese novel) AND ({X} is a historical novel)))",
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a historical novel",
+   "{X} is a Chinese novel",
+   "{X} is from 2005"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a historical novel",
+   "{X} is not a Chinese novel",
+   "{X} is not from 2005"
+  ]
+ },
+ "487": {
+  "logical_query": "(({X} is a novel) AND (({X} is set in the Zhou dynasty) OR ({X} is set in Henan)))"
+ },
+ "506": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a French novel",
+   "{X} is a science fiction novel",
+   "{X} is from 1914"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a French novel",
+   "{X} is not a science fiction novel",
+   "{X} is not from 1914"
+  ]
+ },
+ "507": {
+  "logical_query": "(({X} is a novel) AND ({X} was published in 1937) AND (({X} is a fantasy novel) OR ({X} is a science fiction novel)))"
+ },
+ "524": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a children's book",
+   "{X} is from 1998",
+   "{X} is a fiction book"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a children's book",
+   "{X} is not from 1998",
+   "{X} is not a fiction book"
+  ]
+ },
+ "565": {
+  "logical_query": "(({X} is a book) AND ({X} is written by Isaac Asimov) AND (NOT({X} is about Judaism)))",
+  "atoms": [
+   "{X} is a book",
+   "{X} is about Judaism",
+   "{X} is written by Isaac Asimov"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not about Judaism",
+   "{X} was not written by Isaac Asimov"
+  ]
+ },
+ "575": {
+  "logical_query": "(({X} is a book) AND ({X} is about pop music) AND (NOT({X} is about rock music)))",
+  "atoms": [
+   "{X} is a book",
+   "{X} is about pop music",
+   "{X} is about rock music"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not about pop music",
+   "{X} is not about rock music"
+  ]
+ },
+ "576": {
+  "logical_query": "(({X} is a novel) AND ({X} is a science fiction novel) AND ({X} is from 2012) AND (NOT({X} is an American novel)))",
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a science fiction novel",
+   "{X} is an American novel",
+   "{X} is from 2012"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a science fiction novel",
+   "{X} is not an American novel",
+   "{X} is not from 2012"
+  ]
+ },
+ "587": {
+  "logical_query": "(({X} is a novel) AND ({X} is a book)) AND ({X} is a military novel) AND ({X} is from 1922)"
+ },
+ "590": {
+  "logical_query": "(({X} is a book) AND ({X} is a novel)) AND ({X} is a postmodern work) AND ({X} is set in Asia)"
+ },
+ "603": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a fiction book",
+   "{X} is a Catholic book",
+   "{X} is from the 1960s"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a fiction book",
+   "{X} is not a Catholic book",
+   "{X} is not from the 1960s"
+  ]
+ },
+ "632": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a fiction novel",
+   "{X} is an autobiographical novel",
+   "{X} is from 2004"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a fiction novel",
+   "{X} is not an autobiographical novel",
+   "{X} is not from 2004"
+  ]
+ },
+ "641": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is an environmental fiction book",
+   "{X} is an American book",
+   "{X} is from 2006"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not an environmental fiction book",
+   "{X} is not an American book",
+   "{X} is not from 2006"
+  ]
+ },
+ "651": {
+  "logical_query": "(({X} is a novel) AND ({X} is a non-fiction novel) AND ({X} is an LGBT novel))"
+ },
+ "689": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a British novel",
+   "{X} is from 1800"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a British novel",
+   "{X} is not from 1800"
+  ]
+ },
+ "707": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a non-fiction book",
+   "{X} is from 1910"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a non-fiction book",
+   "{X} is not from 1910"
+  ]
+ },
+ "710": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a fantasy novel",
+   "{X} is from 1940"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a fantasy novel",
+   "{X} is not from 1940"
+  ]
+ },
+ "716": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a poetry book",
+   "{X} is from 1929"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a poetry book",
+   "{X} is not from 1929"
+  ]
+ },
+ "720": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a non-fiction book",
+   "{X} is from 1844"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a non-fiction book",
+   "{X} is not from 1844"
+  ]
+ },
+ "721": {
+  "logical_query": "(({X} is a novel) AND ({X} is about families) AND (({X} is set in Boston) AND ({X} is set in New England)))"
+ },
+ "730": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a crime novel",
+   "{X} is an American crime novel",
+   "{X} is from 1932"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a crime novel",
+   "{X} is not an American crime novel",
+   "{X} is not from 1932"
+  ]
+ },
+ "733": {
+  "atoms": [
+   "{X} is a book",
+   "{X} is a Science book",
+   "{X} is a young adult book",
+   "{X} is a British book",
+   "{X} is from 2008"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a Science book",
+   "{X} is not a young adult book",
+   "{X} is not a British book",
+   "{X} is not from 2008"
+  ]
+ },
+ "755": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a speculative fiction novel",
+   "{X} is a Satirical novel",
+   "{X} is a Parody novel",
+   "{X} is from the 1990s"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a speculative fiction novel",
+   "{X} is not a Satirical novel",
+   "{X} is not a Parody novel",
+   "{X} is not from the 1990s"
+  ]
+ },
+ "759": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a Sociology novel",
+   "{X} is a British novel",
+   "{X} is a Gothic novel",
+   "{X} is from the 2nd millennium"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a Sociology novel",
+   "{X} is not a British novel",
+   "{X} is not a Gothic novel",
+   "{X} is not from the 2nd millennium"
+  ]
+ },
+ "768": {
+  "logical_query": "(({X} is a book) AND (({X} is a historical book) AND ({X} is a novel)) AND ({X} is from the 1890s) AND ({X} was published by Harper & Brothers))"
+ },
+ "780": {
+  "logical_query": "(({X} is a book) AND ({X} is a non-fiction book) AND ({X} is a French book) AND (({X} is from the 1990s) AND ({X} was published in 1997)))",
+  "atoms": [
+   "{X} is a book",
+   "{X} is a non-fiction book",
+   "{X} is a French book",
+   "{X} is from the 1990s",
+   "{X} was published in 1997"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a non-fiction book",
+   "{X} is not a French book",
+   "{X} is not from the 1990s",
+   "{X} was not published in 1997"
+  ]
+ },
+ "801": {
+  "atoms": [
+   "{X} is a novel",
+   "{X} is a science fiction novel",
+   "{X} is a space opera novel",
+   "{X} is from the 2000s",
+   "{X} is set in a fictional location"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not a science fiction novel",
+   "{X} is not a space opera novel",
+   "{X} is not from the 2000s",
+   "{X} is not set in a fictional location"
+  ]
+ },
+ "821": {
+  "logical_query": "(({X} is a book) AND ({X} is a British book) AND ({X} is a sci fi book) AND ({X} is set on a fictional planet) AND (NOT({X} is a novel series)))",
+  "atoms": [
+   "{X} is a book",
+   "{X} is a British book",
+   "{X} is a sci fi book",
+   "{X} is set on a fictional planet",
+   "{X} is a novel series"
+  ],
+  "negated_atoms": [
+   "{X} is not a book",
+   "{X} is not a British book",
+   "{X} is not a sci fi book",
+   "{X} is not set on a fictional planet",
+   "{X} is not a novel series"
+  ]
+ },
+ "835": {
+  "logical_query": "(({X} is a novel) AND ({X} is a young adult novel) AND ({X} is set in Oceania) AND (NOT(({X} is an Australian novel) AND ({X} is a children's novel))))"
+ },
+ "840": {
+  "logical_query": "((({X} is a novel) AND ({X} is an Irish novel) AND (({X} is from 2011) OR ({X} is from 2013))) OR ({X} is a Skulduggery Pleasant book))"
+ },
+ "847": {
+  "logical_query": "((({X} is a novel) AND ({X} is written by Alan Duff)) OR (({X} is a novel) AND ({X} is a 1990 debut novel)) OR (({X} is a book) AND ({X} is based on Twin Peaks)))",
+  "atoms": [
+   "{X} is a novel",
+   "{X} is written by Alan Duff",
+   "{X} is a 1990 debut novel",
+   "{X} is based on Twin Peaks",
+   "{X} is a book"
+  ],
+  "negated_atoms": [
+   "{X} is not a novel",
+   "{X} is not written by Alan Duff",
+   "{X} is not a 1990 debut novel",
+   "{X} is not based on Twin Peaks",
+   "{X} is not a book"
+  ]
+ },
+ "922": {
+  "logical_query": "((({X} is a family) AND ({X} is an Asparagales)) OR ({X} is a Boryaceae))",
+  "atoms": [
+   "{X} is a family",
+   "{X} is an Asparagales",
+   "{X} is a Boryaceae"
+  ],
+  "negated_atoms": [
+   "{X} is not a family",
+   "{X} is not an Asparagales",
+   "{X} is not a Boryaceae"
+  ]
+ },
+ "932": {
+  "logical_query": "(({X} is a tree) AND (({X} is in Malaysia) OR ({X} is in Southeast Asia)))"
+ },
+ "935": {
+  "logical_query": "((({X} is a tree) AND ({X} is from South Korea)) OR (({X} is a flora) AND ({X} is endemic to Korea)))"
+ },
+ "1010": {
+  "logical_query": "((({X} is an orchid) AND ({X} is a plant)) AND (({X} is from Belize) AND ({X} is from Honduras)))"
+ },
+ "1020": {
+  "logical_query": "(({X} is a tree) AND (({X} is from North-Central United States) AND ({X} is from Northwestern United States)))"
+ },
+ "1029": {
+  "atoms": [
+   "{X} is an Asterid genus",
+   "{X} is used in Native American medicine"
+  ],
+  "negated_atoms": [
+   "{X} is not an Asterid genus",
+   "{X} is not used in Native American medicine"
+  ]
+ },
+ "1030": {
+  "logical_query": "(({X} is flora) AND (({X} is from Norfolk Island) AND ({X} is from Indonesia)))"
+ },
+ "1033": {
+  "logical_query": "((({X} is a plant) AND ({X} is from the Western Indian Ocean)) AND (({X} is a tree) AND ({X} is from the Caribbean)))"
+ },
+ "1048": {
+  "logical_query": "(({X} is a flora) AND (({X} is from Yemen) AND ({X} is from Egypt)))"
+ },
+ "1051": {
+  "logical_query": "(({X} is a flora) AND ({X} is from the North-Central United States) AND ({X} is a tree) AND ({X} is from Mexico))",
+  "atoms": [
+   "{X} is a flora",
+   "{X} is from the North-Central United States",
+   "{X} is a tree",
+   "{X} is from Mexico"
+  ],
+  "negated_atoms": [
+   "{X} is not a flora",
+   "{X} is not from the North-Central United States",
+   "{X} is not a tree",
+   "{X} is not from Mexico"
+  ]
+ },
+ "1060": {
+  "logical_query": "(({X} is a flora) AND (({X} is from South America) AND ({X} is from the Central African Republic)))"
+ },
+ "1072": {
+  "atoms": [
+   "{X} is a plant",
+   "{X} is only found in Samoa"
+  ],
+  "negated_atoms": [
+   "{X} is not a plant",
+   "{X} is not only found in Samoa"
+  ]
+ },
+ "1086": {
+  "logical_query": "(({X} is a flora) AND ({X} is only found in Bulgaria))",
+  "atoms": [
+   "{X} is a flora",
+   "{X} is only found in Bulgaria"
+  ],
+  "negated_atoms": [
+   "{X} is not a flora",
+   "{X} is not only found in Bulgaria"
+  ]
+ },
+ "1112": {
+  "logical_query": "(({X} is a plant) AND ({X} is only found in Lesotho))",
+  "atoms": [
+   "{X} is a plant",
+   "{X} is only found in Lesotho"
+  ],
+  "negated_atoms": [
+   "{X} is not a plant",
+   "{X} is not only found in Lesotho"
+  ]
+ },
+ "1119": {
+  "logical_query": "(({X} is a plant) AND ({X} is only found in the Juan Fernández Islands))",
+  "atoms": [
+   "{X} is a plant",
+   "{X} is only found in the Juan Fernández Islands"
+  ],
+  "negated_atoms": [
+   "{X} is not a plant",
+   "{X} is not only found in the Juan Fernández Islands"
+  ]
+ },
+ "1130": {
+  "atoms": [
+   "{X} is an Arecaceae",
+   "{X} is monotypic",
+   "{X} is afrotropical"
+  ],
+  "negated_atoms": [
+   "{X} is not an Arecaceae",
+   "{X} is not monotypic",
+   "{X} is not afrotropical"
+  ]
+ },
+ "1131": {
+  "logical_query": "(({X} is an Angiosperm) AND ({X} is an Orchid) AND (({X} is from Thailand) AND ({X} is from Indonesia)))"
+ },
+ "1137": {
+  "logical_query": "(({X} is a flora) AND (({X} is from the Caucasus) AND ({X} is from Southeastern Europe) AND ({X} is from Eastern Asia)))"
+ },
+ "1139": {
+  "logical_query": "(({X} is a flora) AND (({X} is from the Neotropical realm) AND ({X} is from the Afrotropical realm)) AND ({X} is from Guinea))"
+ },
+ "1142": {
+  "logical_query": "(({X} is a flora) AND (({X} is from Alaska) AND ({X} is from New Mexico) AND ({X} is from the Northwestern United States)))"
+ },
+ "1143": {
+  "logical_query": "(({X} is a garden plant) AND (({X} is from Northern Europe) AND ({X} is from the Northeastern United States)))"
+ },
+ "1148": {
+  "logical_query": "(({X} is a flora of Malesia) AND ({X} is an Orchid) AND (({X} is from New Guinea) AND ({X} is from the Pacific)))"
+ },
+ "1149": {
+  "logical_query": "(({X} is a flora) AND ({X} is Holarctic) AND (({X} is from the United States) AND ({X} is from North-Central China)))"
+ },
+ "1150": {
+  "logical_query": "(({X} is a plant) AND ({X} is poisonous) AND (({X} is from the United States) AND ({X} is from South America)))"
+ },
+ "1151": {
+  "logical_query": "(({X} is flora) AND (({X} is found in Wyoming) AND ({X} is found in Colorado) AND ({X} is found in the Great Lakes region)))"
+ },
+ "1153": {
+  "logical_query": "(({X} is a flora) AND ({X} is a Paleotropical flora) AND (({X} is from China) AND ({X} is from New Caledonia)))"
+ },
+ "1154": {
+  "logical_query": "(({X} is a genus) AND ({X} is an Annonaceae genus) AND (({X} is from Indo-China) AND ({X} is from Malesia)))"
+ },
+ "1167": {
+  "logical_query": "(({X} is a tree) AND (({X} is native to South America) AND ({X} is native to Mexico)) AND ({X} grows in Sri Lanka))"
+ },
+ "1169": {
+  "atoms": [
+   "{X} is a plant",
+   "{X} is a Rubiaceae plant",
+   "{X} is a tropical plant",
+   "{X} is from the Dominican Republic"
+  ],
+  "negated_atoms": [
+   "{X} is not a plant",
+   "{X} is not a Rubiaceae plant",
+   "{X} is not a tropical plant",
+   "{X} is not from the Dominican Republic"
+  ]
+ },
+ "1170": {
+  "logical_query": "(({X} is a tree) AND ({X} is flora) AND (({X} is from the Southern United States) AND ({X} is from the Southwestern United States))"
+ },
+ "1172": {
+  "logical_query": "(({X} is a plant) AND ({X} is a carnivorous plant) AND (({X} is from Asia) AND ({X} is from Angola) AND ({X} is from Ethiopia)))"
+ },
+ "1179": {
+  "logical_query": "(({X} is a flora) AND ({X} is drought tolerant) AND (({X} is from the Sierra Nevada) AND ({X} is from Nuevo Leon))"
+ },
+ "1191": {
+  "logical_query": "(({X} is flora) AND (({X} is found in Belize) AND ({X} is found in Peru) AND ({X} is found in the South-Central United States)))"
+ },
+ "1198": {
+  "logical_query": "(({X} is a tree) AND (({X} is from China) AND ({X} is from Korea)) AND (NOT({X} is from Japan)))"
+ },
+ "1202": {
+  "logical_query": "(({X} is a flora) AND (({X} is from Northern Europe) AND ({X} is from Southeastern Europe)) AND (NOT({X} is from Central Europe)))"
+ },
+ "1203": {
+  "logical_query": "(({X} is an Orchid) AND (({X} is from Indonesia) AND ({X} is from Malaysia)) AND (NOT({X} is from the Philippines)))"
+ },
+ "1222": {
+  "logical_query": "(({X} is a tree) AND (({X} is from Colombia) AND ({X} is from Brazil)) AND (NOT({X} is found in Ecuador)))"
+ },
+ "1225": {
+  "logical_query": "((NOT({X} is from Canada) AND ({X} is a flora)) AND (({X} is a tree) AND ({X} is from the Northwestern United States)))"
+ },
+ "1226": {
+  "logical_query": "(({X} is a plant) AND (({X} is from the Southwestern US) AND ({X} is from the Southeastern US)) AND (NOT({X} is from the South-Central US)))"
+ },
+ "1227": {
+  "logical_query": "(({X} is a tree) AND (({X} is from Indomalesia) AND ({X} is from Papuasia)) AND (NOT({X} is from New Guinea)))"
+ },
+ "1237": {
+  "logical_query": "(({X} is an Orchid) AND (({X} is from Indonesia) AND ({X} is from Malaysia)) AND (NOT({X} is from the Philippines)))"
+ },
+ "1248": {
+  "logical_query": "((({X} is a tropical flora) AND ({X} is a tree)) AND ({X} is from New Guinea) AND (NOT({X} is from Malesia)))"
+ },
+ "1249": {
+  "logical_query": "(({X} is a tree) AND (({X} is from North-Central US) AND ({X} is from Southern US)) AND (NOT({X} is from Canada)))"
+ },
+ "1250": {
+  "atoms": [
+   "{X} is a flora of India",
+   "{X} is a flora of the Australasian",
+   "{X} is an orchid",
+   "{X} is from Malaya"
+  ],
+  "negated_atoms": [
+   "{X} is not a flora of India",
+   "{X} is not a flora of the Australasian",
+   "{X} is not an orchid",
+   "{X} is not from Malaya"
+  ]
+ },
+ "1287": {
+  "atoms": [
+   "{X} is a crop",
+   "{X} originates from Canada",
+   "{X} is a Monotypic Cucurbitaceae",
+   "{X} is a Monotypic Cucurbitales"
+  ],
+  "negated_atoms": [
+   "{X} is not a crop",
+   "{X} does not originate from Canada",
+   "{X} is not a Monotypic Cucurbitaceae",
+   "{X} is not a Monotypic Cucurbitales"
+  ]
+ },
+ "1349": {
+  "logical_query": "((({X} is an animal) AND ({X} is endemic to Virginia)) OR (({X} is a crustacean) AND ({X} is a cave dweller)))",
+  "atoms": [
+   "{X} is a crustacean",
+   "{X} is a cave dweller",
+   "{X} is an animal",
+   "{X} is endemic to Virginia"
+  ],
+  "negated_atoms": [
+   "{X} is not a crustacean",
+   "{X} is not a cave dweller",
+   "{X} is not an animal",
+   "{X} is not endemic to Virginia"
+  ]
+ },
+ "1362": {
+  "atoms": [
+   "{X} is a bird",
+   "{X} is only found in the Democratic Republic of the Congo",
+   "{X} was discovered in 1949"
+  ],
+  "negated_atoms": [
+   "{X} is not a bird",
+   "{X} is not only found in the Democratic Republic of the Congo",
+   "{X} was not discovered in 1949"
+  ]
+ },
+ "1372": {
+  "logical_query": "(({X} is an animal) AND ({X} is from Antarctica) AND (({X} is prehistoric) OR ({X} is from the Paleogene)))",
+  "atoms": [
+   "{X} is an animal",
+   "{X} is prehistoric",
+   "{X} is from Antarctica",
+   "{X} is from the Paleogene"
+  ],
+  "negated_atoms": [
+   "{X} is not an animal",
+   "{X} is not prehistoric",
+   "{X} is not from Antarctica",
+   "{X} is not from the Paleogene"
+  ]
+ },
+ "1409": {
+  "logical_query": "(({X} is a reptile) AND ({X} is from the Triassic) AND ({X} is from South America) AND (NOT({X} is from the Late Triassic)))",
+  "atoms": [
+   "{X} is a reptile",
+   "{X} is from South America",
+   "{X} is from the Triassic",
+   "{X} is from the Late Triassic"
+  ],
+  "negated_atoms": [
+   "{X} is not a reptile",
+   "{X} is not from South America",
+   "{X} is not from the Triassic",
+   "{X} is not from the Late Triassic"
+  ]
+ },
+ "1441": {
+  "logical_query": "(({X} is fauna) AND ({X} is endangered) AND (({X} is from North America) AND ({X} is from Nicaragua)))"
+ },
+ "1443": {
+  "logical_query": "(({X} is a fish) AND ({X} is a freshwater fish) AND (({X} is from Argentina) AND ({X} is from Peru))"
+ },
+ "1456": {
+  "logical_query": "(({X} is an animal) AND (({X} is from Oceania) AND ({X} is from North America)) AND ({X} is from the Paleozoic period) AND ({X} is extinct))"
+ },
+ "1462": {
+  "logical_query": "(({X} is a Marine Invertebrate) AND (({X} is from Western Asia) AND ({X} is from Africa)))"
+ },
+ "1463": {
+  "logical_query": "(({X} is a bird) AND (({X} is from New South Wales) AND ({X} is from South America)))"
+ },
+ "1469": {
+  "logical_query": "(({X} is a frog) AND ({X} is an amphibian) AND (({X} is from Honduras) AND ({X} is from South America)))"
+ },
+ "1478": {
+  "atoms": [
+   "{X} is a bird",
+   "{X} is from Central America",
+   "{X} is now only found in North America"
+  ],
+  "negated_atoms": [
+   "{X} is not a bird",
+   "{X} is not from Central America",
+   "{X} is not now only found in North America"
+  ]
+ },
+ "1479": {
+  "logical_query": "(({X} is a bird) AND (({X} is from Myanmar) AND ({X} is from Sri Lanka)))"
+ },
+ "1489": {
+  "logical_query": "((({X} is an animal) AND ({X} is a fish)) AND ({X} is from Africa) AND ({X} is critically endangered))"
+ },
+ "1500": {
+  "logical_query": "(({X} is a bird) AND ({X} is only found in Annobón))",
+  "atoms": [
+   "{X} is a bird",
+   "{X} is only found in Annobón"
+  ],
+  "negated_atoms": [
+   "{X} is not a bird",
+   "{X} is not only found in Annobón"
+  ]
+ },
+ "1518": {
+  "logical_query": "(({X} is an animal) AND ({X} is only found in Trinidad and Tobago))",
+  "atoms": [
+   "{X} is an animal",
+   "{X} is only found in Trinidad and Tobago"
+  ],
+  "negated_atoms": [
+   "{X} is not an animal",
+   "{X} is not only found in Trinidad and Tobago"
+  ]
+ },
+ "1535": {
+  "atoms": [
+   "{X} is a bird",
+   "{X} is found only in Angola"
+  ],
+  "negated_atoms": [
+   "{X} is not a bird",
+   "{X} is not found only in Angola"
+  ]
+ },
+ "1561": {
+  "logical_query": "(({X} is fauna) AND ({X} is endangered fauna) AND (({X} is from East Asia) AND ({X} is from Vietnam)))"
+ },
+ "1565": {
+  "logical_query": "((({X} is an animal) AND ({X} is from North America) AND ({X} is from the Cenozoic era)) AND (({X} is an animal) AND ({X} is from South America) AND ({X} is from the Pleistocene epoch)) AND (({X} is an animal) AND ({X} is a bird) AND ({X} is prehistoric))"
+ },
+ "1566": {
+  "logical_query": "(({X} is fauna) AND ({X} is a bird)) AND ({X} is from Oceania) AND ({X} was described in 1895)"
+ },
+ "1569": {
+  "logical_query": "(({X} is a marine mammal) AND (({X} is from Sub-Saharan Africa) AND ({X} is from South America) AND ({X} is from Oceania)))"
+ },
+ "1571": {
+  "logical_query": "(({X} is an animal) AND ({X} is from the Cenozoic era) AND (({X} is from Europe) AND ({X} is from the Australasian realm)) AND ({X} is fauna) AND ({X} is extinct))"
+ },
+ "1572": {
+  "logical_query": "(({X} is an animal) AND ({X} is extinct) AND ({X} is prehistoric) AND (({X} is from South America) AND ({X} is from Asia)))"
+ },
+ "1575": {
+  "logical_query": "(({X} is a snake) AND (({X} is from Mexico) AND ({X} is from Suriname)))"
+ },
+ "1581": {
+  "logical_query": "(({X} is a bird) AND ({X} is a Holarctic Native bird) AND (({X} is from the Western United States) AND ({X} is from Ecuador)))"
+ },
+ "1582": {
+  "logical_query": "(({X} is a freshwater fish) AND (({X} is from Ecuador) AND ({X} is from North America) AND ({X} is from Western Central America)))"
+ },
+ "1585": {
+  "logical_query": "(({X} is a fish) AND ({X} is a freshwater fish) AND (({X} is from Central America) AND ({X} is from Colombia) AND ({X} is from Panama)))"
+ },
+ "1589": {
+  "logical_query": "(({X} is an insect) AND (({X} is from Africa) AND ({X} is from East Asia) AND ({X} is from Melanesia)))"
+ },
+ "1590": {
+  "logical_query": "(({X} is a Mollusc) AND ({X} is an Invertebrate)) AND ({X} is from Angola) AND ({X} is from Sao Tome and Principe)"
+ },
+ "1593": {
+  "logical_query": "(({X} is a bird) AND ({X} is native) AND (({X} is in the Western United States) AND ({X} is in the Guianas) AND ({X} is in the Rio Grande valleys)))"
+ },
+ "1596": {
+  "logical_query": "(({X} is fauna of Melanesia) AND ({X} is a mammal) AND (({X} is from Western New Guinea) AND ({X} is from East Asia)))"
+ },
+ "1605": {
+  "logical_query": "(({X} is a mammal) AND (({X} is from Asia) AND ({X} is from South America) AND ({X} is from the Neotropical realm)) AND ({X} is from the Neogene period))"
+ },
+ "1610": {
+  "logical_query": "(({X} is a mammal) AND ({X} is a prehistoric mammal) AND (({X} is from Asia) AND ({X} is from North America)) AND (NOT({X} is extinct in Europe)))"
+ },
+ "1612": {
+  "logical_query": "(({X} is a mammal) AND ({X} is an endangered fauna) AND ({X} is from Asia) AND (NOT({X} is a mammal of Southeast Asia)))"
+ },
+ "1613": {
+  "logical_query": "(({X} is fauna of Mexico) AND ({X} is fauna of Brazil) AND (NOT(({X} is a bird) AND ({X} is from the Amazon basin))))",
+  "atoms": [
+   "{X} is a bird",
+   "{X} is from the Amazon basin",
+   "{X} is fauna of Mexico",
+   "{X} is fauna of Brazil"
+  ],
+  "negated_atoms": [
+   "{X} is not a bird",
+   "{X} is not from the Amazon basin",
+   "{X} is not fauna of Mexico",
+   "{X} is not fauna of Brazil"
+  ]
+ },
+ "1626": {
+  "logical_query": "((({X} is fauna of South China) AND ({X} is fauna of Vietnam)) AND (NOT(({X} is a bird) AND ({X} is from Yunnan))))"
+ },
+ "1627": {
+  "logical_query": "(({X} is a moth) AND (({X} is from the Middle East) AND ({X} is from Madagascar)) AND (NOT({X} is from Mauritius)))"
+ },
+ "1629": {
+  "logical_query": "(({X} is a mammal) AND ({X} is fauna)) AND ({X} is from Asia) AND ({X} is endangered) AND (NOT({X} is fauna of Southeast Asia))"
+ },
+ "1633": {
+  "logical_query": "(({X} is an animal) AND ({X} is extinct) AND (({X} is from North America) AND ({X} is from Hispaniola)) AND (NOT({X} is a Miocene insect)))"
+ },
+ "1684": {
+  "logical_query": "((({X} is from the Cretaceous) AND ({X} is a mollusc) AND ({X} is from Europe)) OR (({X} is from the Cretaceous) AND ({X} is a cephalopod) AND ({X} is from North America)) OR (({X} is from the Late Cretaceous) AND ({X} is a cephalopod) AND ({X} is from North America)))"
+ },
+ "1699": {
+  "logical_query": "((({X} is a mammal) AND (({X} is from Guadeloupe) OR ({X} is from Dominica))) OR (({X} is fauna) AND ({X} is from Saint Kitts and Nevis)))"
+ },
+ "1712": {
+  "logical_query": "(({X} is an Eared seal) OR ({X} is an Otariinae) OR (({X} is a mammal) AND ({X} is from New Zealand)))",
+  "atoms": [
+   "{X} is an Eared seal",
+   "{X} is a mammal",
+   "{X} is from New Zealand",
+   "{X} is an Otariinae"
+  ],
+  "negated_atoms": [
+   "{X} is not an Eared seal",
+   "{X} is not a mammal",
+   "{X} is not from New Zealand",
+   "{X} is not an Otariinae"
+  ]
+ },
+ "1718": {
+  "logical_query": "((({X} is a bird) AND ({X} is from the Oligocene) AND ({X} is Australian)) OR ({X} is Suliformes) OR (({X} is a bird) AND ({X} is from the Paleogene) AND ({X} is from Oceania)))"
+ }
+}
