@@ -47,6 +47,16 @@ class TestEvaluateFormula(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     evaluate_formula("a", {"a": invalid_probability})
 
+    def test_when_atom_probability_is_zero_then_formula_probability_is_zero(self):
+        probability = evaluate_formula("a", {"a": 0.0})
+
+        self.assertAlmostEqual(probability, 0.0)
+
+    def test_when_atom_probability_is_one_then_formula_probability_is_one(self):
+        probability = evaluate_formula("a", {"a": 1.0})
+
+        self.assertAlmostEqual(probability, 1.0)
+
 
 class TestBuildProblogProgram(unittest.TestCase):
     def test_when_program_is_built_then_it_is_a_problog_simple_program(self):
