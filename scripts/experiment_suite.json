@@ -19,7 +19,6 @@
       "retriever_name": "bm25-main",
       "top_n": 200,
       "top_k": 10,
-      "logic_backend": "ProbLog",
       "estimator_config": {
         "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
@@ -37,7 +36,6 @@
       "retriever_name": "bm25-main",
       "top_n": 200,
       "top_k": 10,
-      "logic_backend": "ProbLog",
       "estimator_config": {
         "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",
@@ -55,7 +53,6 @@
       "retriever_name": "bm25-main",
       "top_n": 200,
       "top_k": 10,
-      "logic_backend": "ProbLog",
       "estimator_config": {
         "model_name": "meta-llama/Meta-Llama-3.1-8B-Instruct",
         "device": "cuda",

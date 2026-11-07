@@ -16,7 +16,6 @@ from typing import Any
 
 from llm_bayesian_reasoning.estimators.factory import (
     create_estimator_from_components,
-    create_estimator_from_config,
     load_model_and_tokenizer_from_config,
 )
 from llm_bayesian_reasoning.pipeline.config import (
@@ -30,7 +29,6 @@ from llm_bayesian_reasoning.pipeline.metrics import compute_metrics
 from llm_bayesian_reasoning.pipeline.pipeline import (
     CONTENT_FREE_KEY,
     build_record_result,
-    create_logic_backend,
     score_candidate_documents,
 )
 from llm_bayesian_reasoning.problog_models.problog_models import (
@@ -124,21 +122,6 @@ def _build_variant_atoms(
     positive_atoms: list[ProblogAtom] = record["atoms"]
     negated_atoms: list[ProblogAtom] = record["negated_atoms"]
 
-    if estimator_type == EstimatorType.DPL_PIPELINE:
-        query_context = f"Query: {record['query']}" if record["query"] else None
-        positive_atoms = [
-            ProblogAtom(
-                atom=atom.atom, probability=atom.probability, context=query_context
-            )
-            for atom in positive_atoms
-        ]
-        negated_atoms = [
-            ProblogAtom(
-                atom=atom.atom, probability=atom.probability, context=query_context
-            )
-            for atom in negated_atoms
-        ]
-
     if estimator_type in PAIRED_ESTIMATOR_TYPES:
         if not negated_atoms:
             raise ValueError(
@@ -157,18 +140,6 @@ def _build_variant_atoms(
 
 def _model_signature(variant: ExperimentVariantConfig) -> tuple[str, str, str]:
     estimator_config = variant.estimator_config
-    if estimator_config.estimator_type == EstimatorType.DEEP_PROBLOG:
-        return (
-            estimator_config.estimator_type.value,
-            str(estimator_config.deepproblog_model_dir),
-            estimator_config.device,
-        )
-    if estimator_config.estimator_type == EstimatorType.DPL_PIPELINE:
-        return (
-            estimator_config.estimator_type.value,
-            str(estimator_config.dpl_pipeline_model_dir),
-            estimator_config.device,
-        )
     return (
         estimator_config.model_name,
         estimator_config.device,
@@ -178,10 +149,9 @@ def _model_signature(variant: ExperimentVariantConfig) -> tuple[str, str, str]:
 
 def _scoring_signature(
     variant: ExperimentVariantConfig,
-) -> tuple[str, str, bool, str, str, float]:
+) -> tuple[str, bool, str, str, float]:
     estimator_config = variant.estimator_config
     return (
-        variant.logic_backend.value,
         estimator_config.estimator_type.value,
         estimator_config.include_retrieved_text,
         estimator_config.true_token,
@@ -252,7 +222,6 @@ def _prepare_variant_outputs(
             "retriever_name": variant.retriever_name,
             "top_n": variant.top_n,
             "top_k": variant.top_k,
-            "logic_backend": variant.logic_backend.value,
             "estimator_type": variant.estimator_config.estimator_type.value,
             "include_retrieved_text": variant.estimator_config.include_retrieved_text,
             "model_name": variant.estimator_config.model_name,
@@ -282,7 +251,6 @@ def _variant_mlflow_params(
         "retrieval_pool_size": retriever_config.retrieval_pool_size,
         "top_n": variant.top_n,
         "top_k": variant.top_k,
-        "logic_backend": variant.logic_backend.value,
         "estimator_type": estimator_config.estimator_type.value,
         "include_retrieved_text": estimator_config.include_retrieved_text,
         "model_name": estimator_config.model_name,
@@ -290,16 +258,6 @@ def _variant_mlflow_params(
         "true_token": estimator_config.true_token,
         "false_token": estimator_config.false_token,
         "contrastive_temperature": estimator_config.contrastive_temperature,
-        "deepproblog_model_dir": (
-            str(estimator_config.deepproblog_model_dir)
-            if estimator_config.deepproblog_model_dir is not None
-            else None
-        ),
-        "dpl_pipeline_model_dir": (
-            str(estimator_config.dpl_pipeline_model_dir)
-            if estimator_config.dpl_pipeline_model_dir is not None
-            else None
-        ),
     }
 
 
@@ -456,28 +414,16 @@ def main() -> None:
 
             for model_variants in variants_by_model.values():
                 reference_variant = model_variants[0]
-                estimator_type = reference_variant.estimator_config.estimator_type
-                model = None
-                tokenizer = None
-                if estimator_type in {
-                    EstimatorType.DEEP_PROBLOG,
-                    EstimatorType.DPL_PIPELINE,
-                }:
-                    logger.info(
-                        "Using local model bundle for %s",
-                        estimator_type.value,
-                    )
-                else:
-                    logger.info(
-                        "Loading shared model resources for %s",
-                        reference_variant.estimator_config.model_name,
-                    )
-                    model, tokenizer = load_model_and_tokenizer_from_config(
-                        reference_variant.estimator_config
-                    )
+                logger.info(
+                    "Loading shared model resources for %s",
+                    reference_variant.estimator_config.model_name,
+                )
+                model, tokenizer = load_model_and_tokenizer_from_config(
+                    reference_variant.estimator_config
+                )
 
                 variants_by_scoring: dict[
-                    tuple[str, str, bool, str, str, float],
+                    tuple[str, bool, str, str, float],
                     list[ExperimentVariantConfig],
                 ] = defaultdict(list)
                 for variant in model_variants:
@@ -492,20 +438,11 @@ def main() -> None:
                         retriever_config.name,
                         scoring_top_n,
                     )
-                    if scoring_variant.estimator_config.estimator_type in {
-                        EstimatorType.DEEP_PROBLOG,
-                        EstimatorType.DPL_PIPELINE,
-                    }:
-                        estimator = create_estimator_from_config(
-                            scoring_variant.estimator_config
-                        )
-                    else:
-                        estimator = create_estimator_from_components(
-                            scoring_variant.estimator_config,
-                            model,
-                            tokenizer,
-                        )
-                    logic_backend = create_logic_backend(scoring_variant.logic_backend)
+                    estimator = create_estimator_from_components(
+                        scoring_variant.estimator_config,
+                        model,
+                        tokenizer,
+                    )
 
                     for record_id, record in data.items():
                         query = record["query"]
@@ -531,7 +468,6 @@ def main() -> None:
                             formula=record["problog_formula"],
                             candidate_documents=candidate_documents,
                             estimator=estimator,
-                            logic_backend=logic_backend,
                             include_retrieved_text=scoring_variant.estimator_config.include_retrieved_text,
                             record_id=record_id,
                             atom_scores=atom_scores,

@@ -1,6 +1,8 @@
 import logging
 import re
 
+from problog import get_evaluatable
+from problog.program import PrologString
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -8,7 +10,21 @@ from pydantic import (
     computed_field,
 )
 
+logger = logging.getLogger(__name__)
+
 _predicate_mismatch_warned: set[tuple[frozenset, frozenset]] = set()
+
+
+def evaluate_problog_program(program: str) -> float:
+    try:
+        db = PrologString(program)
+        result = get_evaluatable().create_from(db).evaluate()
+        if result:
+            return float(next(iter(result.values())))
+        return 0.0
+    except Exception:  # noqa: BLE001
+        logger.exception("ProbLog evaluation failed for program:\n%s", program)
+        return 0.0
 
 
 class _AstNodeModel(BaseModel):
@@ -216,15 +232,6 @@ class ProblogAtom(BaseModel):
         """
         entity_str = entity if entity is not None else "{X}"
         return f"{self.probability}::{self.problog_atom_format}({entity_str!r})."
-
-    def to_deepproblog_fact(self, entity: str | None = None) -> str:
-        """Convert the atom to a DeepProbLog-compatible fact.
-
-        The initial DeepProbLog integration uses fixed probabilistic facts,
-        which share syntax with ProbLog. Neural predicates can replace this in a
-        later step.
-        """
-        return self.to_proposition(entity)
 
     def to_prompt_with_context(self, entity: str, separator: str = "\n\n") -> str:
         """Convert the ProblogAtom to a prompt format for LLMs.
@@ -482,18 +489,4 @@ class ProblogFormula(BaseModel):
                     provided_predicates,
                 )
 
-        return propositions + "\n" + formula_rule + "\n" + query_directive
-
-    def to_deepproblog(self, atoms: list[ProblogAtom], entity: str) -> str:
-        """Convert the formula to a DeepProbLog-compatible program.
-
-        The initial DeepProbLog integration reuses fixed probabilistic facts and
-        standard rule syntax so the logical structure stays identical.
-        """
-        entity_str = entity if entity is not None else "{X}"
-        propositions = "\n".join(atom.to_deepproblog_fact(entity) for atom in atoms)
-        atom_map = {atom.atom: atom.problog_atom_format for atom in atoms}
-        formula_body = self._formula_to_body(atom_map, entity_expr=f"{entity_str!r}")
-        formula_rule = f"{self.head}({entity_str!r}) :-\n    {formula_body}."
-        query_directive = f"query({self.head}({entity_str!r}))."
         return propositions + "\n" + formula_rule + "\n" + query_directive

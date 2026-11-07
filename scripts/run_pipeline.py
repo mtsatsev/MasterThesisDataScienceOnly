@@ -20,7 +20,6 @@ from llm_bayesian_reasoning.pipeline.config import (
     PAIRED_ESTIMATOR_TYPES,
     EstimatorConfig,
     EstimatorType,
-    LogicBackendType,
     PipelineConfig,
     RetrieverType,
 )
@@ -77,11 +76,6 @@ def _load_preprocessed(
             logical = parsed.get("logical query") or parsed.get("logical_query") or ""
 
             atoms_text = [atom for atom in atoms_raw if isinstance(atom, str)]
-            query_context = (
-                f"Query: {query}"
-                if estimator_type == EstimatorType.DPL_PIPELINE and query
-                else None
-            )
             atoms_objs: list[ProblogAtom] | list[tuple[ProblogAtom, ProblogAtom]]
             if estimator_type in PAIRED_ESTIMATOR_TYPES:
                 negated_atoms_text = [
@@ -98,16 +92,11 @@ def _load_preprocessed(
                         f"{len(negated_atoms_text)} negated_atoms"
                     )
                 atoms_objs = [
-                    (
-                        _build_atom(atom, context=query_context),
-                        _build_atom(negated_atom, context=query_context),
-                    )
+                    (_build_atom(atom), _build_atom(negated_atom))
                     for atom, negated_atom in zip(atoms_text, negated_atoms_text)
                 ]
             else:
-                atoms_objs = [
-                    _build_atom(atom, context=query_context) for atom in atoms_text
-                ]
+                atoms_objs = [_build_atom(atom) for atom in atoms_text]
 
             formula = ProblogFormula(formula=_normalize_placeholder(logical))
 
@@ -131,25 +120,13 @@ def _make_results_folder(
     model_name: str,
     retriever_type: RetrieverType,
     estimator_type: EstimatorType,
-    logic_backend: LogicBackendType,
 ) -> Path:
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     safe_model = Path(model_name).stem.replace("/", "_")
-    run_name = (
-        f"{ts}_{retriever_type.value}_{safe_model}_"
-        f"{estimator_type.value}_{logic_backend.value}"
-    )
+    run_name = f"{ts}_{retriever_type.value}_{safe_model}_{estimator_type.value}"
     out = root / run_name
     out.mkdir(parents=True, exist_ok=False)
     return out
-
-
-def _estimator_run_name(estimator_cfg: EstimatorConfig) -> str:
-    if estimator_cfg.estimator_type == EstimatorType.DEEP_PROBLOG:
-        return Path(str(estimator_cfg.deepproblog_model_dir)).name
-    if estimator_cfg.estimator_type == EstimatorType.DPL_PIPELINE:
-        return Path(str(estimator_cfg.dpl_pipeline_model_dir)).name
-    return estimator_cfg.model_name
 
 
 def main():
@@ -182,28 +159,10 @@ def main():
 
     p.add_argument("--model-name", type=str, default=None)
     p.add_argument(
-        "--deepproblog-model-dir",
-        type=Path,
-        default=None,
-        help="Path to a trained DeepProbLog model bundle for estimator-type DeepProbLog",
-    )
-    p.add_argument(
-        "--dpl-pipeline-model-dir",
-        type=Path,
-        default=None,
-        help="Path to a trained DPL pipeline run directory for estimator-type DPLPipeline",
-    )
-    p.add_argument(
         "--estimator-type",
         type=str,
         choices=[e.value for e in EstimatorType],
         default=EstimatorType.TRUE_FALSE_LLM.value,
-    )
-    p.add_argument(
-        "--logic-backend",
-        type=str,
-        choices=[e.value for e in LogicBackendType],
-        default=LogicBackendType.PROBLOG.value,
     )
     p.add_argument(
         "--retriever-type",
@@ -265,16 +224,12 @@ def main():
             device=args.device,
             estimator_type=EstimatorType(args.estimator_type),
             include_retrieved_text=args.include_retrieved_text,
-            deepproblog_model_dir=args.deepproblog_model_dir,
-            dpl_pipeline_model_dir=args.dpl_pipeline_model_dir,
         )
     else:
         estimator_cfg = EstimatorConfig(
             estimator_type=EstimatorType(args.estimator_type),
             device=args.device,
             include_retrieved_text=args.include_retrieved_text,
-            deepproblog_model_dir=args.deepproblog_model_dir,
-            dpl_pipeline_model_dir=args.dpl_pipeline_model_dir,
         )
 
     # Create a temporary PipelineConfig to determine run naming
@@ -287,17 +242,15 @@ def main():
         estimator_config=estimator_cfg,
         retriever_type=RetrieverType(args.retriever_type),
         retriever_model_name=args.retriever_model_name,
-        logic_backend=LogicBackendType(args.logic_backend),
         mlflow_experiment=args.mlflow_experiment,
     )
 
     try:
         results_dir = _make_results_folder(
             results_root,
-            _estimator_run_name(estimator_cfg),
+            estimator_cfg.model_name,
             pipe_cfg.retriever_type,
             estimator_cfg.estimator_type,
-            pipe_cfg.logic_backend,
         )
     except FileExistsError:
         # Unlikely because of timestamp but handle gracefully
@@ -322,19 +275,8 @@ def main():
                 "retriever_model_name": args.retriever_model_name,
                 "model_name": estimator_cfg.model_name,
                 "estimator_type": estimator_cfg.estimator_type.value,
-                "logic_backend": args.logic_backend,
                 "device": estimator_cfg.device,
                 "include_retrieved_text": estimator_cfg.include_retrieved_text,
-                "deepproblog_model_dir": (
-                    str(estimator_cfg.deepproblog_model_dir)
-                    if estimator_cfg.deepproblog_model_dir is not None
-                    else None
-                ),
-                "dpl_pipeline_model_dir": (
-                    str(estimator_cfg.dpl_pipeline_model_dir)
-                    if estimator_cfg.dpl_pipeline_model_dir is not None
-                    else None
-                ),
                 "mlflow_experiment": args.mlflow_experiment,
             },
             cf,
@@ -379,7 +321,6 @@ def main():
         estimator_config=pipe_cfg.estimator_config,
         retriever_type=pipe_cfg.retriever_type,
         retriever_model_name=pipe_cfg.retriever_model_name,
-        logic_backend=pipe_cfg.logic_backend,
         mlflow_experiment=args.mlflow_experiment,
     )
 

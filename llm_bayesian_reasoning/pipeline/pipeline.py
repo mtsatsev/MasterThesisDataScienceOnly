@@ -7,16 +7,7 @@ import mlflow
 
 from llm_bayesian_reasoning.estimators.base import BaseEstimator
 from llm_bayesian_reasoning.estimators.factory import create_estimator_from_config
-from llm_bayesian_reasoning.pipeline.config import (
-    LogicBackendType,
-    PipelineConfig,
-    RetrieverType,
-)
-from llm_bayesian_reasoning.pipeline.logic_backends import (
-    DeepProbLogBackend,
-    LogicBackend,
-    ProbLogBackend,
-)
+from llm_bayesian_reasoning.pipeline.config import PipelineConfig, RetrieverType
 from llm_bayesian_reasoning.pipeline.metrics import (
     compute_metrics,
     compute_record_metrics,
@@ -24,6 +15,7 @@ from llm_bayesian_reasoning.pipeline.metrics import (
 from llm_bayesian_reasoning.problog_models.problog_models import (
     ProblogAtom,
     ProblogFormula,
+    evaluate_problog_program,
 )
 from llm_bayesian_reasoning.retrievers.base_retriever import BaseRetriever
 from llm_bayesian_reasoning.retrievers.document import ScoredDocument
@@ -35,14 +27,6 @@ logger = logging.getLogger(__name__)
 # ("N/A" entity and context), used for contextual calibration (Zhao et al., 2021).
 CONTENT_FREE_KEY = "__content_free__"
 CONTENT_FREE_INPUT = "N/A"
-
-
-def create_logic_backend(backend_type: LogicBackendType) -> LogicBackend:
-    if backend_type == LogicBackendType.PROBLOG:
-        return ProbLogBackend()
-    if backend_type == LogicBackendType.DEEPPROBLOG:
-        return DeepProbLogBackend()
-    raise ValueError(f"Unsupported logic backend: {backend_type}")
 
 
 def build_or_load_index(
@@ -150,7 +134,6 @@ def score_candidate_documents(
     formula: ProblogFormula,
     candidate_documents: list[ScoredDocument],
     estimator: BaseEstimator,
-    logic_backend: LogicBackend,
     include_retrieved_text: bool = False,
     record_id: int | str | None = None,
     atom_scores: dict[str, dict[str, float]] | None = None,
@@ -172,7 +155,9 @@ def score_candidate_documents(
             )
         try:
             scored_atoms = estimator.score_probability(scoring_atoms, entity)
-            probability = logic_backend.evaluate(scored_atoms, formula, entity)
+            probability = evaluate_problog_program(
+                formula.to_problog(scored_atoms, entity)
+            )
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Scoring failed for record %s, entity %r — skipping entity",
@@ -363,9 +348,6 @@ def run_pipeline(
             logger.exception("Failed to instantiate estimator from config")
             raise
 
-    logic_backend = create_logic_backend(config.logic_backend)
-    logger.info("Using logic backend: %s", config.logic_backend.value)
-
     with open(output_path, "a", encoding="utf-8") as out_f:
         for record_id, record in data.items():
             if record_id in processed_ids:
@@ -403,7 +385,6 @@ def run_pipeline(
                     formula=formula,
                     candidate_documents=top_n_results,
                     estimator=estimator,
-                    logic_backend=logic_backend,
                     include_retrieved_text=config.estimator_config.include_retrieved_text,
                     record_id=record_id,
                     atom_scores=atom_scores,
@@ -459,7 +440,6 @@ def run_pipeline(
                         # Structured per-query table row
                         row: dict = {
                             "record_id": [record_id],
-                            "logic_backend": config.logic_backend.value,
                             "query": [query],
                             "model": [config.estimator_config.model_name],
                             "ground_truth": [

@@ -35,8 +35,6 @@ class EstimatorType(str, Enum):
     LIKELIHOOD_BASED_PERPLEXITY = "Perplexity"
     LIKELIHOOD_BASED_CONTRASTIVE = "Contrastive"
     LIKELIHOOD_BASED_YES_NO = "YesNoContinuation"
-    DEEP_PROBLOG = "DeepProbLog"
-    DPL_PIPELINE = "DPLPipeline"
     PMI_EVIDENCE_GAIN = "PMIEvidenceGain"
     CHANNEL_BAYES_FACTOR = "ChannelBayesFactor"
     EXPECTED_VERBALIZED = "ExpectedVerbalized"
@@ -53,13 +51,6 @@ PAIRED_ESTIMATOR_TYPES = frozenset(
         EstimatorType.NEGATION_CONSISTENT_YES_NO,
     }
 )
-
-
-class LogicBackendType(str, Enum):
-    """Enumeration of supported logic evaluation backends."""
-
-    PROBLOG = "ProbLog"
-    DEEPPROBLOG = "DeepProbLog"
 
 
 class RetrieverType(str, Enum):
@@ -108,14 +99,6 @@ class EstimatorConfig(BaseModel):
         default=False,
         description="Include retrieved document text in Problog atom context",
     )
-    deepproblog_model_dir: Path | None = Field(
-        default=None,
-        description="Path to a trained DeepProbLog atom-classifier bundle",
-    )
-    dpl_pipeline_model_dir: Path | None = Field(
-        default=None,
-        description="Path to a trained DPL pipeline run directory",
-    )
     quantization: BitsAndBytesConfig = Field(
         default_factory=lambda: BitsAndBytesConfig(
             load_in_4bit=True,
@@ -163,16 +146,6 @@ class EstimatorConfig(BaseModel):
                 raise ValueError(
                     "contrastive_temperature is required for yes/no continuation estimation"
                 )
-        if self.estimator_type == EstimatorType.DEEP_PROBLOG:
-            if self.deepproblog_model_dir is None:
-                raise ValueError(
-                    "deepproblog_model_dir is required for the DeepProbLog estimator"
-                )
-        if self.estimator_type == EstimatorType.DPL_PIPELINE:
-            if self.dpl_pipeline_model_dir is None:
-                raise ValueError(
-                    "dpl_pipeline_model_dir is required for the DPLPipeline estimator"
-                )
         return self
 
 
@@ -207,10 +180,6 @@ class PipelineConfig(BaseModel):
         default="intfloat/e5-base-v2",
         description="Dense retriever model identifier when applicable",
         min_length=1,
-    )
-    logic_backend: LogicBackendType = Field(
-        default=LogicBackendType.PROBLOG,
-        description="Logic backend used to evaluate the final program",
     )
     mlflow_experiment: str | None = Field(
         default=None,
@@ -269,10 +238,6 @@ class ExperimentVariantConfig(BaseModel):
     )
     top_n: int = Field(default=50, ge=1, description="Candidate pool size to rerank")
     top_k: int = Field(default=10, ge=1, description="Final ranked output size")
-    logic_backend: LogicBackendType = Field(
-        default=LogicBackendType.PROBLOG,
-        description="Logic backend used for this variant",
-    )
     estimator_config: EstimatorConfig = Field(
         default_factory=EstimatorConfig,
         description="Estimator configuration for this variant",

@@ -1,5 +1,8 @@
 from llm_bayesian_reasoning.pipeline.config import EstimatorConfig, PipelineConfig
 from llm_bayesian_reasoning.pipeline.metrics import compute_metrics
+from llm_bayesian_reasoning.problog_models.problog_models import (
+    evaluate_problog_program,
+)
 
 __all__ = [
     "EstimatorConfig",
@@ -24,6 +27,4 @@ def run_pipeline(*args, **kwargs):
 
 
 def evaluate_problog(program: str) -> float:
-    from llm_bayesian_reasoning.pipeline.logic_backends import evaluate_problog_program
-
     return evaluate_problog_program(program)

@@ -21,12 +21,12 @@ import math
 from multiprocessing import Pool
 from pathlib import Path
 
-from llm_bayesian_reasoning.pipeline.logic_backends import ProbLogBackend
 from llm_bayesian_reasoning.pipeline.metrics import compute_metrics
 from llm_bayesian_reasoning.pipeline.pipeline import CONTENT_FREE_KEY
 from llm_bayesian_reasoning.problog_models.problog_models import (
     ProblogAtom,
     ProblogFormula,
+    evaluate_problog_program,
 )
 
 EPS = 1e-12
@@ -57,7 +57,6 @@ def _replay_record(args: tuple[dict, str, str]) -> tuple:
         return row["id"], row
     formula = ProblogFormula(formula=formula_text)
     priors = _atom_priors(atom_scores, entities, method)
-    backend = ProbLogBackend()
     scores = {}
     for entity in entities:
         atoms = [
@@ -67,7 +66,7 @@ def _replay_record(args: tuple[dict, str, str]) -> tuple:
             )
             for a, p in atom_scores[entity].items()
         ]
-        scores[entity] = backend.evaluate(atoms, formula, entity)
+        scores[entity] = evaluate_problog_program(formula.to_problog(atoms, entity))
     ranked = sorted(entities, key=lambda e: scores[e], reverse=True)
     return row["id"], {**row, "ranked_entities": ranked, "scores": scores}
 
