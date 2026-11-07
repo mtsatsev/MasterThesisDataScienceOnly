@@ -1,6 +1,7 @@
 import unittest
 
-from problog.program import PrologString
+from problog.logic import Term
+from problog.program import SimpleProgram
 
 from llm_bayesian_reasoning.logic.formula import (
     build_problog_program,
@@ -48,48 +49,51 @@ class TestEvaluateFormula(unittest.TestCase):
 
 
 class TestBuildProblogProgram(unittest.TestCase):
+    def test_when_program_is_built_then_it_is_a_problog_simple_program(self):
+        program = build_problog_program("a", {"a": 0.8})
+
+        self.assertIsInstance(program, SimpleProgram)
+
     def test_when_one_atom_is_given_then_program_is_its_fact_rule_and_query(self):
         program = build_problog_program("a", {"a": 0.8})
 
-        self.assertEqual(program, "0.8::a.\nformula_holds :- a.\nquery(formula_holds).")
-
-    def test_when_several_atoms_are_given_then_each_gets_a_fact_line_in_input_order(
-        self,
-    ):
-        program = build_problog_program("b, a", {"b": 0.5, "a": 0.8})
-
         self.assertEqual(
-            program,
-            "0.5::b.\n0.8::a.\nformula_holds :- b, a.\nquery(formula_holds).",
+            [str(statement) for statement in program],
+            ["0.8::a", "formula_holds :- a", "query(formula_holds)"],
         )
 
-    def test_when_formula_has_logical_operators_then_rule_body_keeps_them_unchanged(
-        self,
-    ):
-        for formula in ("a, b", "a; b", "\\+a", "a; (a, b)", "\\+(a, b)"):
+    def test_when_several_atoms_are_given_then_each_gets_a_fact_in_input_order(self):
+        program = build_problog_program("b, a", {"b": 0.5, "a": 0.8})
+
+        facts = list(program)[:2]
+
+        self.assertEqual([str(fact) for fact in facts], ["0.5::b", "0.8::a"])
+
+    def test_when_formula_has_logical_operators_then_rule_body_has_matching_terms(self):
+        a, b = Term("a"), Term("b")
+        expected_bodies = {
+            "a, b": a & b,
+            "a; b": a | b,
+            "\\+a": ~a,
+            "a; (a, b)": a | (a & b),
+            "\\+(a, b)": ~(a & b),
+        }
+
+        for formula, expected_body in expected_bodies.items():
             with self.subTest(formula=formula):
                 program = build_problog_program(formula, {"a": 0.3, "b": 0.9})
 
-                self.assertIn(f"formula_holds :- {formula}.", program.splitlines())
+                rule = list(program)[2]
 
-    def test_when_formula_has_logical_operators_then_problog_parses_every_statement(
-        self,
-    ):
-        for formula in ("a, b", "a; b", "\\+a", "a; (a, b)", "\\+(a, b)"):
-            with self.subTest(formula=formula):
-                program = build_problog_program(formula, {"a": 0.3, "b": 0.9})
+                self.assertEqual(rule, Term("formula_holds") << expected_body)
 
-                statements = list(PrologString(program))
-
-                self.assertEqual(len(statements), 4)
-
-    def test_when_probability_is_zero_one_or_very_small_then_problog_reads_it_back_unchanged(
+    def test_when_probability_is_zero_one_or_very_small_then_fact_keeps_the_exact_value(
         self,
     ):
         for probability in (0.0, 1.0, 1e-12):
             with self.subTest(probability=probability):
                 program = build_problog_program("a", {"a": probability})
 
-                fact = list(PrologString(program))[0]
+                fact = list(program)[0]
 
                 self.assertEqual(float(fact.probability), probability)
