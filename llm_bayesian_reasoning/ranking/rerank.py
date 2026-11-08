@@ -13,3 +13,26 @@ class ScoredCandidate(BaseModel):
     entity: str = Field(min_length=1)
     probability: Probability
     atom_probabilities: dict[str, Probability] = Field(min_length=1)
+
+
+def rerank(scored_candidates: list[ScoredCandidate]) -> list[ScoredCandidate]:
+    """
+    Return the candidates from highest to lowest probability.
+
+    Candidates with equal probability keep their input order.
+
+    Args:
+        scored_candidates (list[ScoredCandidate]):
+            The scored candidates of one query, in retrieval order.
+
+    Returns:
+        list[ScoredCandidate]: A new list with every candidate, reordered.
+    """
+    entities = set()
+    for scored in scored_candidates:
+        if scored.entity in entities:
+            raise ValueError(f"Entity {scored.entity!r} is scored more than once")
+        entities.add(scored.entity)
+    return sorted(
+        scored_candidates, key=lambda scored: scored.probability, reverse=True
+    )
