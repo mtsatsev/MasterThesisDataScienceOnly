@@ -21,5 +21,14 @@ class AtomEstimator(Protocol):
     def estimate_atoms(
         self, atoms: list[Atom], candidate: Candidate
     ) -> dict[str, float]:
-        """Return the probability of each atom, keyed by atom name."""
+        """
+        Return the probability of each atom, keyed by atom name.
+        
+        Args:
+            atoms (list[Atom]): The atoms to score.
+            candidate (Candidate): The candidate entity to score.
+
+        Returns:
+            dict[str, float]: The probability of each atom, keyed by atom name.
+        """
         ...
