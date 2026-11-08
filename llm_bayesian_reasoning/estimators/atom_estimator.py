@@ -23,7 +23,7 @@ class AtomEstimator(Protocol):
     ) -> dict[str, float]:
         """
         Return the probability of each atom, keyed by atom name.
-        
+
         Args:
             atoms (list[Atom]): The atoms to score.
             candidate (Candidate): The candidate entity to score.
