@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -83,3 +85,67 @@ def prepare_record(
         )
     except (KeyError, ValueError) as error:
         raise ValueError(f"Query {query_id}: {error}") from error
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """
+    Return the parsed lines of a JSON Lines file.
+    Args:
+        path (Path):
+            The path to the JSON Lines file.
+
+    Returns:
+        list[dict[str, Any]]: The parsed lines of the JSON Lines file.
+    """
+    rows = []
+    with path.open(encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            try:
+                rows.append(json.loads(line))
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{path}: invalid JSON on line {line_number}") from exc
+    return rows
+
+
+def prepare_dataset(
+    raw_path: Path,
+    quest_path: Path,
+    output_path: Path,
+    repairs: dict[int, RecordRepair],
+) -> None:
+    """
+    Write the validated record of every raw dataset line to a JSON Lines file.
+
+    Nothing is written unless every record is valid.
+
+    Args:
+        raw_path (Path):
+            The raw dataset, one query per line.
+        quest_path (Path):
+            The QUEST file, giving the docs of each original query.
+        output_path (Path):
+            The file to write, replaced if it exists.
+        repairs (dict[int, RecordRepair]):
+            A dictionary mapping query ids to their corrections.
+    """
+    raw_records = _read_jsonl(raw_path)
+    if not raw_records:
+        raise ValueError(f"{raw_path}: file has no records")
+    relevant_entities = {
+        quest["original_query"]: quest["docs"] for quest in _read_jsonl(quest_path)
+    }
+
+    query_ids = set()
+    for raw in raw_records:
+        if raw["id"] in query_ids:
+            raise ValueError(f"{raw_path}: repeats query id {raw['id']}")
+        query_ids.add(raw["id"])
+    for query_id in repairs:
+        if query_id not in query_ids:
+            raise ValueError(f"A repair names unknown query id {query_id}")
+
+    records = [prepare_record(raw, relevant_entities, repairs) for raw in raw_records]
+    output_path.write_text(
+        "".join(record.model_dump_json() + "\n" for record in records),
+        encoding="utf-8",
+    )
