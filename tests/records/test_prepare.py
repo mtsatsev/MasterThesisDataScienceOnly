@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,11 @@ from llm_bayesian_reasoning.records.query_record import (
     QueryRecord,
     load_query_records,
 )
+from llm_bayesian_reasoning.records.record_repairs import load_record_repairs
+
+DATA_DIRECTORY = Path(__file__).parents[2] / "llm_bayesian_reasoning" / "data"
+RAW_RECORDS_PATH = DATA_DIRECTORY / "preprocessed_data/parsed_test_with_negs.jsonl"
+QUEST_PATH = DATA_DIRECTORY / "quest_data/test.jsonl"
 
 ORIGINAL_QUERY = "<mark>Books by Robert Nozick</mark>"
 RELEVANT_ENTITIES = {ORIGINAL_QUERY: ["Invariances", "Socratic Puzzles"]}
@@ -451,3 +457,53 @@ class TestPrepareDataset(unittest.TestCase):
 
         with self.assertRaises(FileNotFoundError):
             self.prepare()
+
+
+@unittest.skipUnless(
+    RAW_RECORDS_PATH.exists() and QUEST_PATH.exists(), "The QUEST data is not present"
+)
+class TestRealDataset(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        directory = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(directory.cleanup)
+        output_path = Path(directory.name) / "records.jsonl"
+        cls.repairs = load_record_repairs()
+        prepare_dataset(RAW_RECORDS_PATH, QUEST_PATH, output_path, cls.repairs)
+        cls.records = load_query_records(output_path)
+
+        with RAW_RECORDS_PATH.open(encoding="utf-8") as file:
+            cls.raw_records = [json.loads(line) for line in file]
+        with QUEST_PATH.open(encoding="utf-8") as file:
+            cls.quest_records = [json.loads(line) for line in file]
+
+    def test_when_real_data_is_prepared_then_every_query_is_written_in_order(self):
+        self.assertEqual(
+            [record.query_id for record in self.records],
+            [raw["id"] for raw in self.raw_records],
+        )
+
+    def test_when_real_data_is_prepared_then_labels_are_the_quest_docs(self):
+        self.assertEqual(
+            {record.query: record.relevant_entities for record in self.records},
+            {quest["query"]: quest["docs"] for quest in self.quest_records},
+        )
+
+    def test_when_real_data_is_prepared_then_every_domain_keeps_its_queries(self):
+        self.assertEqual(
+            Counter(record.domain for record in self.records),
+            {"films": 459, "books": 441, "plants": 414, "animals": 413},
+        )
+
+    def test_when_written_file_is_loaded_then_it_equals_the_prepared_records(self):
+        relevant_entities = {
+            quest["original_query"]: quest["docs"] for quest in self.quest_records
+        }
+
+        self.assertEqual(
+            self.records,
+            [
+                prepare_record(raw, relevant_entities, self.repairs)
+                for raw in self.raw_records
+            ],
+        )
