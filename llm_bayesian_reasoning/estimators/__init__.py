@@ -1,17 +1,17 @@
-from llm_bayesian_reasoning.estimators.base import BaseEstimator
-from llm_bayesian_reasoning.estimators.likelihood_based_estimator import (
-    LikelihoodBasedEstimator,
-)
-from llm_bayesian_reasoning.estimators.likelihood_based_yes_no_estimator import (
-    LikelihoodBasedYesNoEstimator,
-)
-from llm_bayesian_reasoning.estimators.true_false_lm_estimator import (
-    TrueFalseLLMEstimator,
-)
+from importlib import import_module
 
-__all__ = [
-    "BaseEstimator",
-    "LikelihoodBasedEstimator",
-    "LikelihoodBasedYesNoEstimator",
-    "TrueFalseLLMEstimator",
-]
+_MODULES = {
+    "BaseEstimator": "base",
+    "LikelihoodBasedEstimator": "likelihood_based_estimator",
+    "LikelihoodBasedYesNoEstimator": "likelihood_based_yes_no_estimator",
+    "TrueFalseLLMEstimator": "true_false_lm_estimator",
+}
+
+__all__ = list(_MODULES)
+
+
+def __getattr__(name: str):
+    """Import an estimator class on first use, so the package does not load transformers."""
+    if name not in _MODULES:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return getattr(import_module(f"{__name__}.{_MODULES[name]}"), name)
