@@ -1,11 +1,21 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from llm_bayesian_reasoning.records.atoms import Atom
-from llm_bayesian_reasoning.records.prepare import RecordRepair, prepare_record
-from llm_bayesian_reasoning.records.query_record import QueryRecord
+from llm_bayesian_reasoning.records.prepare import (
+    RecordRepair,
+    prepare_dataset,
+    prepare_record,
+)
+from llm_bayesian_reasoning.records.query_record import (
+    QueryRecord,
+    load_query_records,
+)
 
 ORIGINAL_QUERY = "<mark>Books by Robert Nozick</mark>"
 RELEVANT_ENTITIES = {ORIGINAL_QUERY: ["Invariances", "Socratic Puzzles"]}
@@ -265,3 +275,179 @@ class TestPrepareRecord(unittest.TestCase):
             prepare_record(raw_record(), {}, {})
 
         self.assertIsInstance(caught.exception.__cause__, ValueError)
+
+
+class TestPrepareDataset(unittest.TestCase):
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        self.raw_path = root / "raw.jsonl"
+        self.quest_path = root / "quest.jsonl"
+        self.output_path = root / "queries.jsonl"
+
+    def raw_line(self, query_id: int, **changes: Any) -> str:
+        return json.dumps(
+            {
+                **raw_record(),
+                "id": query_id,
+                "original_query": f"Query {query_id}",
+                **changes,
+            },
+            ensure_ascii=False,
+        )
+
+    def quest_line(self, query_id: int, *docs: str) -> str:
+        return json.dumps(
+            {
+                "original_query": f"Query {query_id}",
+                "docs": list(docs or [f"Entity of {query_id}"]),
+                "scores": None,
+            },
+            ensure_ascii=False,
+        )
+
+    def write_files(self, raw_lines: list[str], quest_lines: list[str]) -> None:
+        self.raw_path.write_text("\n".join(raw_lines) + "\n", encoding="utf-8")
+        self.quest_path.write_text("\n".join(quest_lines) + "\n", encoding="utf-8")
+
+    def prepare(self, repairs: dict[int, RecordRepair] | None = None) -> None:
+        prepare_dataset(self.raw_path, self.quest_path, self.output_path, repairs or {})
+
+    def test_when_raw_file_has_records_then_output_has_one_per_input_in_order(self):
+        self.write_files(
+            [self.raw_line(3), self.raw_line(1), self.raw_line(2)],
+            [self.quest_line(1), self.quest_line(2), self.quest_line(3)],
+        )
+
+        self.prepare()
+
+        self.assertEqual(
+            [record.query_id for record in load_query_records(self.output_path)],
+            [3, 1, 2],
+        )
+
+    def test_when_quest_file_has_docs_then_each_record_gets_its_own_labels(self):
+        self.write_files(
+            [self.raw_line(1), self.raw_line(2)],
+            [self.quest_line(2, "Second"), self.quest_line(1, "First", "Other")],
+        )
+
+        self.prepare()
+
+        self.assertEqual(
+            [
+                record.relevant_entities
+                for record in load_query_records(self.output_path)
+            ],
+            [["First", "Other"], ["Second"]],
+        )
+
+    def test_when_a_repair_is_given_then_only_its_query_is_repaired(self):
+        self.write_files(
+            [self.raw_line(1), self.raw_line(2)],
+            [self.quest_line(1), self.quest_line(2)],
+        )
+
+        self.prepare({2: RecordRepair(logical_query="({X} is a book)")})
+
+        self.assertEqual(
+            [record.formula for record in load_query_records(self.output_path)],
+            ["((a0) , (a1))", "(a0)"],
+        )
+
+    def test_when_record_has_non_ascii_text_then_output_keeps_it_unchanged(self):
+        query = "Karel Jaromír Erben films"
+        self.write_files(
+            [self.raw_line(1, query=query)], [self.quest_line(1, "Kytice")]
+        )
+
+        self.prepare()
+
+        self.assertEqual(load_query_records(self.output_path)[0].query, query)
+        self.assertIn(query, self.output_path.read_text(encoding="utf-8"))
+
+    def test_when_output_already_exists_then_it_is_replaced(self):
+        self.output_path.write_text("old content\n", encoding="utf-8")
+        self.write_files([self.raw_line(1)], [self.quest_line(1)])
+
+        self.prepare()
+
+        self.assertEqual(len(load_query_records(self.output_path)), 1)
+
+    def test_when_a_record_is_invalid_then_error_names_the_query(self):
+        self.write_files([self.raw_line(1), self.raw_line(2)], [self.quest_line(1)])
+
+        with self.assertRaisesRegex(ValueError, "Query 2.*no QUEST entry"):
+            self.prepare()
+
+    def test_when_a_raw_line_is_not_json_then_error_names_the_file_and_line(self):
+        self.write_files([self.raw_line(1), "{not json"], [self.quest_line(1)])
+
+        with self.assertRaisesRegex(ValueError, "raw.jsonl.*line 2"):
+            self.prepare()
+
+    def test_when_a_quest_line_is_not_json_then_error_names_the_file_and_line(self):
+        self.write_files([self.raw_line(1)], [self.quest_line(1), "{not json"])
+
+        with self.assertRaisesRegex(ValueError, "quest.jsonl.*line 2"):
+            self.prepare()
+
+    def test_when_query_id_repeats_then_error_names_the_id(self):
+        self.write_files([self.raw_line(7), self.raw_line(7)], [self.quest_line(7)])
+
+        with self.assertRaisesRegex(ValueError, "query id 7"):
+            self.prepare()
+
+    def test_when_a_repair_names_an_unknown_query_then_error_names_the_id(self):
+        self.write_files([self.raw_line(1)], [self.quest_line(1)])
+
+        with self.assertRaisesRegex(ValueError, "repair.*query id 99"):
+            self.prepare({99: RecordRepair(logical_query="({X} is a book)")})
+
+    def test_when_raw_file_has_no_records_then_error_names_the_file(self):
+        self.raw_path.write_text("", encoding="utf-8")
+        self.quest_path.write_text(self.quest_line(1) + "\n", encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "raw.jsonl.*no records"):
+            self.prepare()
+
+    def test_when_preparation_fails_then_no_output_file_is_created(self):
+        failures = {
+            "invalid record": (
+                [self.raw_line(1), self.raw_line(2)],
+                [self.quest_line(1)],
+            ),
+            "repeated id": ([self.raw_line(7), self.raw_line(7)], [self.quest_line(7)]),
+            "bad raw line": ([self.raw_line(1), "{not json"], [self.quest_line(1)]),
+        }
+
+        for failure, (raw_lines, quest_lines) in failures.items():
+            with self.subTest(failure=failure):
+                self.write_files(raw_lines, quest_lines)
+
+                with self.assertRaises(ValueError):
+                    self.prepare()
+
+                self.assertFalse(self.output_path.exists())
+
+    def test_when_preparation_fails_then_existing_output_is_left_unchanged(self):
+        self.output_path.write_text("previous run\n", encoding="utf-8")
+        self.write_files([self.raw_line(1), self.raw_line(2)], [self.quest_line(1)])
+
+        with self.assertRaises(ValueError):
+            self.prepare()
+
+        self.assertEqual(self.output_path.read_text(encoding="utf-8"), "previous run\n")
+
+    def test_when_raw_file_does_not_exist_then_file_not_found_error_is_raised(self):
+        self.quest_path.write_text(self.quest_line(1) + "\n", encoding="utf-8")
+
+        with self.assertRaises(FileNotFoundError):
+            self.prepare()
+
+    def test_when_quest_file_does_not_exist_then_file_not_found_error_is_raised(self):
+        self.raw_path.write_text(self.raw_line(1) + "\n", encoding="utf-8")
+
+        with self.assertRaises(FileNotFoundError):
+            self.prepare()
