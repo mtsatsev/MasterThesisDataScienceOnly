@@ -122,3 +122,26 @@ def reciprocal_rank(ranked: list[str], relevant: list[str]) -> float:
         if entity in relevant_set:
             return 1 / position
     return 0.0
+
+
+def oracle_ranking(pool: list[str], relevant: list[str]) -> list[str]:
+    """
+    Return the best possible order of a pool: relevant entities first.
+
+    Both groups keep their pool order, and relevant entities outside the pool are
+    not added.
+
+    Args:
+        pool (list[str]):
+            The retrieved entities, in retrieval order.
+        relevant (list[str]):
+            The relevant entities of the query.
+
+    Returns:
+        list[str]: A new list with the same entities, relevant ones first.
+    """
+    _check_inputs(relevant)
+    relevant_set = set(relevant)
+    return [entity for entity in pool if entity in relevant_set] + [
+        entity for entity in pool if entity not in relevant_set
+    ]
