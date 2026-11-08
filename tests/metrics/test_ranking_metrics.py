@@ -1,9 +1,11 @@
 import math
 import unittest
+from itertools import permutations
 
 from llm_bayesian_reasoning.metrics.ranking_metrics import (
     f1_at_k,
     ndcg_at_k,
+    oracle_ranking,
     precision_at_k,
     recall_at_k,
     reciprocal_rank,
@@ -97,3 +99,51 @@ class TestRankingMetrics(unittest.TestCase):
                     metric(RANKED, [], 3)
         with self.assertRaisesRegex(ValueError, "relevant"):
             reciprocal_rank(RANKED, [])
+
+
+class TestOracleRanking(unittest.TestCase):
+    def test_when_pool_has_relevant_entities_then_they_come_first_in_pool_order(self):
+        self.assertEqual(
+            oracle_ranking(["A", "D", "C", "B", "E"], RELEVANT),
+            ["D", "B", "A", "C", "E"],
+        )
+
+    def test_when_a_relevant_entity_was_not_retrieved_then_it_is_not_added(self):
+        self.assertNotIn("X", oracle_ranking(RANKED, RELEVANT))
+
+    def test_when_pool_has_no_relevant_entity_then_its_order_is_kept(self):
+        self.assertEqual(oracle_ranking(["E", "A", "C"], RELEVANT), ["E", "A", "C"])
+
+    def test_when_pool_has_only_relevant_entities_then_its_order_is_kept(self):
+        self.assertEqual(oracle_ranking(["D", "X", "B"], RELEVANT), ["D", "X", "B"])
+
+    def test_when_pool_is_empty_then_result_is_empty(self):
+        self.assertEqual(oracle_ranking([], RELEVANT), [])
+
+    def test_when_oracle_is_computed_then_input_pool_is_unchanged(self):
+        pool = ["A", "D", "C", "B"]
+
+        oracle_ranking(pool, RELEVANT)
+
+        self.assertEqual(pool, ["A", "D", "C", "B"])
+
+    def test_when_pool_is_reordered_any_way_then_no_order_beats_the_oracle(self):
+        oracle = oracle_ranking(RANKED, RELEVANT)
+
+        for ranked in permutations(RANKED):
+            for k in range(1, len(RANKED) + 1):
+                for metric in METRICS_AT_K:
+                    with self.subTest(ranked=ranked, k=k, metric=metric.__name__):
+                        self.assertGreaterEqual(
+                            metric(oracle, RELEVANT, k),
+                            metric(list(ranked), RELEVANT, k),
+                        )
+            with self.subTest(ranked=ranked, metric="reciprocal_rank"):
+                self.assertGreaterEqual(
+                    reciprocal_rank(oracle, RELEVANT),
+                    reciprocal_rank(list(ranked), RELEVANT),
+                )
+
+    def test_when_nothing_is_relevant_then_error_is_raised(self):
+        with self.assertRaisesRegex(ValueError, "relevant"):
+            oracle_ranking(RANKED, [])
