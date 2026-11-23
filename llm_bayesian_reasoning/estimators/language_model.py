@@ -20,3 +20,20 @@ class LanguageModel(Protocol):
                 each token to its log-probability.
         """
         ...
+
+    def continuation_token_logprobs(
+        self, requests: list[tuple[str, str]]
+    ) -> list[list[float]]:
+        """
+        Return, per (prefix, continuation) request, the log-probability of each
+        continuation token after the prefix.
+
+        Args:
+            requests (list[tuple[str, str]]):
+                The (prefix, continuation) pairs to evaluate.
+
+        Returns:
+            list[list[float]]: One list per request, one log-probability per
+                continuation token.
+        """
+        ...
