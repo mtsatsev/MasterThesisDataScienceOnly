@@ -1,10 +1,13 @@
-import json
 from pathlib import Path
 from typing import cast
 
 import bm25s
 
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
+from llm_bayesian_reasoning.retrievers.index_documents import (
+    read_index_documents,
+    write_index_documents,
+)
 from llm_bayesian_reasoning.retrievers.top_candidates import (
     check_top_n,
     top_candidates,
@@ -65,10 +68,7 @@ class BM25Retriever:
         model = bm25s.BM25()
         model.index(_tokenize_documents(texts), show_progress=False)
         model.save(index_path, show_progress=False)
-        with (index_path / "documents.jsonl").open("w", encoding="utf-8") as file:
-            for title, text in zip(titles, texts):
-                document = {"title": title, "text": text}
-                file.write(json.dumps(document, ensure_ascii=False) + "\n")
+        write_index_documents(index_path, titles, texts)
 
     def __init__(self, index_path: Path):
         """
@@ -78,10 +78,7 @@ class BM25Retriever:
             index_path (Path):
                 The index folder.
         """
-        with (index_path / "documents.jsonl").open(encoding="utf-8") as file:
-            documents = [json.loads(line) for line in file]
-        self.titles = [document["title"] for document in documents]
-        self.texts = [document["text"] for document in documents]
+        self.titles, self.texts = read_index_documents(index_path)
         self.model = bm25s.BM25.load(index_path, show_progress=False)
 
     def retrieve(self, query: str, top_n: int) -> list[Candidate]:

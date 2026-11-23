@@ -1,10 +1,12 @@
-import json
 from pathlib import Path
 from typing import Protocol
 
 import numpy as np
 
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
+from llm_bayesian_reasoning.retrievers.index_documents import (
+    read_index_documents,
+)
 from llm_bayesian_reasoning.retrievers.top_candidates import (
     check_top_n,
     top_candidates,
@@ -17,12 +19,6 @@ class QueryEncoder(Protocol):
     def encode(self, texts: list[str]) -> np.ndarray:
         """Return one embedding row per text."""
         ...
-
-
-def _read_jsonl_field(path: Path, field: str) -> list[str]:
-    """Return one field of every line of a JSON Lines file."""
-    with path.open(encoding="utf-8") as file:
-        return [json.loads(line)[field] for line in file]
 
 
 class E5Retriever:
@@ -39,17 +35,12 @@ class E5Retriever:
                 The encoder that embeds queries.
         """
         embeddings = np.load(index_path / "embeddings.npy")
-        self.texts = _read_jsonl_field(index_path / "entities.jsonl", "entity")
-        self.titles = _read_jsonl_field(index_path / "titles.jsonl", "title")
-        for name, rows in (
-            ("entities.jsonl", self.texts),
-            ("titles.jsonl", self.titles),
-        ):
-            if len(rows) != len(embeddings):
-                raise ValueError(
-                    f"{name} has {len(rows)} rows but embeddings.npy has "
-                    f"{len(embeddings)}"
-                )
+        self.titles, self.texts = read_index_documents(index_path)
+        if len(self.titles) != len(embeddings):
+            raise ValueError(
+                f"titles.jsonl and entities.jsonl have {len(self.titles)} rows but "
+                f"embeddings.npy has {len(embeddings)}"
+            )
         self.embeddings = embeddings / np.linalg.norm(embeddings, axis=1, keepdims=True)
         self.query_encoder = query_encoder
 
