@@ -1,11 +1,10 @@
 import math
 import unittest
 
+from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.channel_bayes_factor import (
     ChannelBayesFactorEstimator,
 )
-
-from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.records.atoms import Atom
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
