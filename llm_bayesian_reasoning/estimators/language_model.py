@@ -37,3 +37,18 @@ class LanguageModel(Protocol):
                 continuation token.
         """
         ...
+
+    def truncate_to_tokens(self, text: str, max_tokens: int) -> str:
+        """
+        Return the text cut to its first max_tokens tokens.
+
+        Args:
+            text (str):
+                The text to cut.
+            max_tokens (int):
+                The number of tokens to keep.
+
+        Returns:
+            str: The decoded first max_tokens tokens of the text.
+        """
+        ...
