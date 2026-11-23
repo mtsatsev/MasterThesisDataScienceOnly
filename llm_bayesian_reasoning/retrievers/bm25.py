@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import cast
 
 import bm25s
 import numpy as np
@@ -7,15 +8,34 @@ import numpy as np
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 
 
-def _tokenize(texts: list[str], return_ids: bool) -> list[list[str]]:
-    """Lowercase the texts and split them into words, without English stopwords."""
-    out = bm25s.tokenize(
-        texts, stopwords="en", return_ids=return_ids, show_progress=False
+def _tokenize_documents(texts: list[str]) -> bm25s.tokenization.Tokenized:
+    """
+    Lowercase the texts and split them into word ids, without English stopwords.
+    
+    Args:
+        texts (list[str]): The documents to tokenize.
+    
+    Returns:
+        bm25s.tokenization.Tokenized: The tokenized documents.
+    """
+    tokens = bm25s.tokenize(texts, stopwords="en", return_ids=True, show_progress=False)
+    return cast(bm25s.tokenization.Tokenized, tokens)
 
+
+def _tokenize_query(query: str) -> list[str]:
+    """
+    Lowercase the query and split it into words, without English stopwords.
+
+    Args:
+        query (str): The query text.
+
+    Returns:
+        list[str]: The tokenized query.
+    """
+    tokens = bm25s.tokenize(
+        [query], stopwords="en", return_ids=False, show_progress=False
     )
-    if isinstance(out, list):
-        return out
-    return []
+    return cast(list[list[str]], tokens)[0]
 
 
 class BM25Retriever:
@@ -40,7 +60,7 @@ class BM25Retriever:
             raise ValueError("There are no documents to index")
 
         model = bm25s.BM25()
-        model.index(_tokenize(texts, return_ids=True), show_progress=False)
+        model.index(_tokenize_documents(texts), show_progress=False)
         model.save(index_path, show_progress=False)
         with (index_path / "documents.jsonl").open("w", encoding="utf-8") as file:
             for title, text in zip(titles, texts):
@@ -76,7 +96,7 @@ class BM25Retriever:
         """
         if top_n < 1:
             raise ValueError(f"top_n must be at least 1, got {top_n}")
-        tokens = _tokenize([query], return_ids=False)[0]
+        tokens = _tokenize_query(query)
         if not tokens:
             raise ValueError(f"Query {query!r} has no searchable words")
 
