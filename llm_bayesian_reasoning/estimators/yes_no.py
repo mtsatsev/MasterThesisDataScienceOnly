@@ -16,9 +16,20 @@ def _sigmoid(logit: float) -> float:
     return math.exp(logit) / (1 + math.exp(logit))
 
 
-def _build_prompt(atom: Atom, candidate: Candidate) -> str:
-    """Return the context block, entity, statement and question, one per line."""
-    statement = atom.text.replace("{X}", repr(candidate.entity)).strip()
+def build_yes_no_prompt(statement_template: str, candidate: Candidate) -> str:
+    """
+    Return the context block, entity, statement and question, one per line.
+
+    Args:
+        statement_template (str):
+            An atom text or negated text, with {X} for the entity.
+        candidate (Candidate):
+            The entity and its document.
+
+    Returns:
+        str: The prompt, ending in "Answer:".
+    """
+    statement = statement_template.replace("{X}", repr(candidate.entity)).strip()
     lines = []
     document = candidate.text.strip()
     if document:
@@ -68,7 +79,7 @@ class YesNoEstimator:
         Returns:
             dict[str, float]: The probability that each atom holds.
         """
-        prompts = [_build_prompt(atom, candidate) for atom in atoms]
+        prompts = [build_yes_no_prompt(atom.text, candidate) for atom in atoms]
         logprobs = self.language_model.next_token_logprobs(
             prompts, [YES_TOKEN, NO_TOKEN]
         )
