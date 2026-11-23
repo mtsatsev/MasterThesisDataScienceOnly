@@ -1,28 +1,12 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import fill_entity
+from llm_bayesian_reasoning.estimators.scoring import sigmoid
 from llm_bayesian_reasoning.records.atoms import Atom
 
 TRUE_TOKEN = " True"
 FALSE_TOKEN = " False"
 QUESTION = "Is this phrase true or false?"
-
-
-def _sigmoid(logit: float) -> float:
-    """
-    Return 1 / (1 + e^-logit) without overflowing for large logits.
-
-    Args:
-        logit (float):
-            The input logit.
-
-    Returns:
-        float: The sigmoid of the logit.
-    """
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
 
 
 def _build_prompt(atom: Atom, candidate: Candidate) -> str:
@@ -38,7 +22,7 @@ def _build_prompt(atom: Atom, candidate: Candidate) -> str:
     Returns:
         str: The prompt combining the document and the atom statement with the question.
     """
-    statement = atom.text.replace("{X}", repr(candidate.entity)).strip()
+    statement = fill_entity(atom.text, candidate).strip()
     if statement.endswith((".", "?", "!")):
         statement = statement[:-1]
     statement = f"{statement}. {QUESTION}"
@@ -82,8 +66,6 @@ class TrueFalseEstimator:
             prompts, [TRUE_TOKEN, FALSE_TOKEN]
         )
         return {
-            atom.name: _sigmoid(
-                token_logprobs[TRUE_TOKEN] - token_logprobs[FALSE_TOKEN]
-            )
+            atom.name: sigmoid(token_logprobs[TRUE_TOKEN] - token_logprobs[FALSE_TOKEN])
             for atom, token_logprobs in zip(atoms, logprobs)
         }

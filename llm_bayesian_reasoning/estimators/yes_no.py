@@ -1,19 +1,16 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import (
+    context_block,
+    fill_entity,
+    question_prompt,
+)
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, sigmoid
 from llm_bayesian_reasoning.records.atoms import Atom
 
 YES_TOKEN = " yes"
 NO_TOKEN = " no"
 QUESTION = "Is the statement supported by the context?"
-
-
-def _sigmoid(logit: float) -> float:
-    """Return 1 / (1 + e^-logit) without overflowing for large logits."""
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
 
 
 def build_yes_no_prompt(statement_template: str, candidate: Candidate) -> str:
@@ -29,19 +26,8 @@ def build_yes_no_prompt(statement_template: str, candidate: Candidate) -> str:
     Returns:
         str: The prompt, ending in "Answer:".
     """
-    statement = statement_template.replace("{X}", repr(candidate.entity)).strip()
-    lines = []
-    document = candidate.text.strip()
-    if document:
-        lines += ["Context:", document, ""]
-    lines += [
-        f"Entity: {candidate.entity!r}",
-        f"Statement: {statement}",
-        "",
-        QUESTION,
-        "Answer:",
-    ]
-    return "\n".join(lines)
+    statement = fill_entity(statement_template, candidate).strip()
+    return question_prompt(context_block(candidate), candidate, statement, QUESTION)
 
 
 class YesNoEstimator:
@@ -55,10 +41,7 @@ class YesNoEstimator:
             temperature (float):
                 The divisor of the yes/no gap, positive and finite.
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         self.language_model = language_model
         self.temperature = temperature
 
@@ -84,7 +67,7 @@ class YesNoEstimator:
             prompts, [YES_TOKEN, NO_TOKEN]
         )
         return {
-            atom.name: _sigmoid(
+            atom.name: sigmoid(
                 (token_logprobs[YES_TOKEN] - token_logprobs[NO_TOKEN])
                 / self.temperature
             )

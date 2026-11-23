@@ -1,10 +1,10 @@
 import math
 import unittest
 
-from llm_bayesian_reasoning.estimators.yes_no import YesNoEstimator
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
+from llm_bayesian_reasoning.estimators.yes_no import YesNoEstimator
 from llm_bayesian_reasoning.records.atoms import Atom
+from tests.estimators.fake_language_models import FixedNextTokenModel
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
 AMERICAN = Atom(
@@ -24,18 +24,7 @@ def prompt(statement: str, document: str | None = CANDIDATE.text, entity=None) -
     return f"{context}Entity: {entity}\nStatement: {statement}\n\n{QUESTION}"
 
 
-class FakeLanguageModel:
-    """Return the same next-token log-probabilities for every prompt."""
-
-    def __init__(self, logprobs: dict[str, float] | None = None):
-        self.logprobs = logprobs or {" yes": -1.0, " no": -2.0}
-        self.calls = []
-
-    def next_token_logprobs(
-        self, prompts: list[str], tokens: list[str]
-    ) -> list[dict[str, float]]:
-        self.calls.append((prompts, tokens))
-        return [{token: self.logprobs[token] for token in tokens} for _ in prompts]
+LOGPROBS = {" yes": -1.0, " no": -2.0}
 
 
 def candidate(entity: str = "Blade Runner", text: str = CANDIDATE.text) -> Candidate:
@@ -49,8 +38,8 @@ class TestYesNoEstimator(unittest.TestCase):
         scored: Candidate = CANDIDATE,
         logprobs: dict[str, float] | None = None,
         temperature: float = 1.0,
-    ) -> tuple[dict[str, float], FakeLanguageModel]:
-        language_model = FakeLanguageModel(logprobs)
+    ) -> tuple[dict[str, float], FixedNextTokenModel]:
+        language_model = FixedNextTokenModel(logprobs or LOGPROBS)
         estimator = YesNoEstimator(language_model, temperature=temperature)
         return estimator.estimate_atoms(atoms, scored), language_model
 
@@ -157,7 +146,7 @@ class TestYesNoEstimator(unittest.TestCase):
                 )
 
     def test_when_no_temperature_is_given_then_it_is_one(self):
-        language_model = FakeLanguageModel({" yes": -1.0, " no": -2.0})
+        language_model = FixedNextTokenModel({" yes": -1.0, " no": -2.0})
 
         result = YesNoEstimator(language_model).estimate_atoms([FILM], CANDIDATE)
 
@@ -184,4 +173,6 @@ class TestYesNoEstimator(unittest.TestCase):
         for temperature in (0.0, -1.0, math.nan, math.inf):
             with self.subTest(temperature=temperature):
                 with self.assertRaisesRegex(ValueError, "temperature"):
-                    YesNoEstimator(FakeLanguageModel(), temperature=temperature)
+                    YesNoEstimator(
+                        FixedNextTokenModel(LOGPROBS), temperature=temperature
+                    )

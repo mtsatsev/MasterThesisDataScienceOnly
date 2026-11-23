@@ -1,20 +1,13 @@
-import math
 import re
 
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, sigmoid
 from llm_bayesian_reasoning.records.atoms import Atom
 
 PROMPT_TEMPLATE = "Name something for which the following is true: {}.\nAnswer:"
 BASELINE_PROPERTY = "it exists"
 DISAMBIGUATION_SUFFIX = re.compile(r"\s*\([^)]*\)$")
-
-
-def _sigmoid(logit: float) -> float:
-    """Return 1 / (1 + e^-logit) without overflowing for large logits."""
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
 
 
 class EntityLikelihoodPMIEstimator:
@@ -29,10 +22,7 @@ class EntityLikelihoodPMIEstimator:
             temperature (float):
                 The divisor of the likelihood gain, positive and finite.
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         self.language_model = language_model
         self.temperature = temperature
 
@@ -66,7 +56,7 @@ class EntityLikelihoodPMIEstimator:
         )
         baseline = sum(token_logprobs[0])
         return {
-            atom.name: _sigmoid(
+            atom.name: sigmoid(
                 (sum(token_logprobs[index + 1]) - baseline) / self.temperature
             )
             for index, atom in enumerate(atoms)

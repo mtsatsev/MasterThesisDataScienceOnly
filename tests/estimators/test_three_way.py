@@ -4,6 +4,7 @@ import unittest
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.three_way import ThreeWayEstimator
 from llm_bayesian_reasoning.records.atoms import Atom
+from tests.estimators.fake_language_models import FixedNextTokenModel
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
 AMERICAN = Atom(
@@ -31,18 +32,7 @@ def prompt(statement: str, document: str | None = CANDIDATE.text, entity=None) -
     )
 
 
-class FakeLanguageModel:
-    """Return the same next-token log-probabilities for every prompt."""
-
-    def __init__(self, logprobs: dict[str, float] | None = None):
-        self.logprobs = logprobs or {" A": -1.0, " B": -2.0, " C": -3.0}
-        self.calls = []
-
-    def next_token_logprobs(
-        self, prompts: list[str], tokens: list[str]
-    ) -> list[dict[str, float]]:
-        self.calls.append((prompts, tokens))
-        return [{token: self.logprobs[token] for token in tokens} for _ in prompts]
+LOGPROBS = {" A": -1.0, " B": -2.0, " C": -3.0}
 
 
 def candidate(entity: str = "Blade Runner", text: str = CANDIDATE.text) -> Candidate:
@@ -61,8 +51,8 @@ class TestThreeWayEstimator(unittest.TestCase):
         scored: Candidate = CANDIDATE,
         logprobs: dict[str, float] | None = None,
         **settings: float,
-    ) -> tuple[dict[str, float], FakeLanguageModel]:
-        language_model = FakeLanguageModel(logprobs)
+    ) -> tuple[dict[str, float], FixedNextTokenModel]:
+        language_model = FixedNextTokenModel(logprobs or LOGPROBS)
         estimator = ThreeWayEstimator(language_model, **settings)
         return estimator.estimate_atoms(atoms, scored), language_model
 
@@ -205,10 +195,14 @@ class TestThreeWayEstimator(unittest.TestCase):
         for temperature in (0.0, -1.0, math.nan, math.inf):
             with self.subTest(temperature=temperature):
                 with self.assertRaisesRegex(ValueError, "temperature"):
-                    ThreeWayEstimator(FakeLanguageModel(), temperature=temperature)
+                    ThreeWayEstimator(
+                        FixedNextTokenModel(LOGPROBS), temperature=temperature
+                    )
 
     def test_when_unknown_weight_is_outside_zero_and_one_then_error_names_it(self):
         for weight in (-0.1, 1.1, math.nan):
             with self.subTest(weight=weight):
                 with self.assertRaisesRegex(ValueError, "unknown_weight"):
-                    ThreeWayEstimator(FakeLanguageModel(), unknown_weight=weight)
+                    ThreeWayEstimator(
+                        FixedNextTokenModel(LOGPROBS), unknown_weight=weight
+                    )

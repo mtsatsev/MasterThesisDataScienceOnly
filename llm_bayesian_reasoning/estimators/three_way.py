@@ -1,7 +1,11 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import (
+    context_block,
+    fill_entity,
+    question_prompt,
+)
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, softmax
 from llm_bayesian_reasoning.records.atoms import Atom
 
 LABEL_TOKENS = [" A", " B", " C"]
@@ -12,28 +16,12 @@ QUESTION_WITH_CONTEXT = (
 QUESTION_WITHOUT_CONTEXT = "The statement is:\nA) true\nB) false\nC) unknown"
 
 
-def _softmax(values: list[float]) -> list[float]:
-    """Return the softmax of the values, shifted by their maximum to stay finite."""
-    largest = max(values)
-    exponentials = [math.exp(value - largest) for value in values]
-    total = sum(exponentials)
-    return [exponential / total for exponential in exponentials]
-
-
 def _build_prompt(atom: Atom, candidate: Candidate) -> str:
     """Return the context block, entity, statement and the three-way question."""
-    document = candidate.text.strip()
-    statement = atom.text.replace("{X}", repr(candidate.entity))
-    if document:
-        context = f"Context:\n{document}\n\n"
-        question = QUESTION_WITH_CONTEXT
-    else:
-        context = ""
-        question = QUESTION_WITHOUT_CONTEXT
-    return (
-        f"{context}Entity: {candidate.entity!r}\n"
-        f"Statement: {statement}\n\n{question}\nAnswer:"
-    )
+    context = context_block(candidate)
+    question = QUESTION_WITH_CONTEXT if context else QUESTION_WITHOUT_CONTEXT
+    statement = fill_entity(atom.text, candidate)
+    return question_prompt(context, candidate, statement, question)
 
 
 class ThreeWayEstimator:
@@ -54,10 +42,7 @@ class ThreeWayEstimator:
             unknown_weight (float):
                 The share of p(not mentioned) counted as true, in [0, 1].
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         if not 0.0 <= unknown_weight <= 1.0:
             raise ValueError(f"unknown_weight must be in [0, 1], got {unknown_weight}")
         self.language_model = language_model
@@ -86,7 +71,7 @@ class ThreeWayEstimator:
         logprobs = self.language_model.next_token_logprobs(prompts, LABEL_TOKENS)
         probabilities = {}
         for atom, token_logprobs in zip(atoms, logprobs):
-            supported, _, unknown = _softmax(
+            supported, _, unknown = softmax(
                 [token_logprobs[token] / self.temperature for token in LABEL_TOKENS]
             )
             probabilities[atom.name] = min(

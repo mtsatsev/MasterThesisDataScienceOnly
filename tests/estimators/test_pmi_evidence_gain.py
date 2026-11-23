@@ -6,6 +6,7 @@ from llm_bayesian_reasoning.estimators.pmi_evidence_gain import (
     PMIEvidenceGainEstimator,
 )
 from llm_bayesian_reasoning.records.atoms import Atom
+from tests.estimators.fake_language_models import StoredContinuationModel
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
 AMERICAN = Atom(
@@ -18,22 +19,6 @@ CANDIDATE = Candidate(
 )
 HEAD = "Fact: 'Blade Runner'"
 WITH_DOCUMENT = f"Context:\n{CANDIDATE.text}\n\n{HEAD}"
-
-
-class FakeLanguageModel:
-    """Return stored per-token log-probabilities per (prefix, continuation)."""
-
-    def __init__(
-        self, token_logprobs: dict[tuple[str, str], list[float]] | None = None
-    ):
-        self.token_logprobs = token_logprobs or {}
-        self.calls = []
-
-    def continuation_token_logprobs(
-        self, requests: list[tuple[str, str]]
-    ) -> list[list[float]]:
-        self.calls.append(requests)
-        return [self.token_logprobs.get(request, [-1.0]) for request in requests]
 
 
 def candidate(entity: str = "Blade Runner", text: str = CANDIDATE.text) -> Candidate:
@@ -51,8 +36,8 @@ class TestPMIEvidenceGainEstimator(unittest.TestCase):
         token_logprobs: dict[tuple[str, str], list[float]] | None = None,
         scored: Candidate = CANDIDATE,
         temperature: float = 1.0,
-    ) -> tuple[dict[str, float], FakeLanguageModel]:
-        language_model = FakeLanguageModel(token_logprobs)
+    ) -> tuple[dict[str, float], StoredContinuationModel]:
+        language_model = StoredContinuationModel(token_logprobs)
         estimator = PMIEvidenceGainEstimator(language_model, temperature=temperature)
         return estimator.estimate_atoms(atoms, scored), language_model
 
@@ -196,7 +181,7 @@ class TestPMIEvidenceGainEstimator(unittest.TestCase):
                 self.assertAlmostEqual(result["a0"], sigmoid(expected_logit))
 
     def test_when_no_temperature_is_given_then_it_is_one(self):
-        language_model = FakeLanguageModel(
+        language_model = StoredContinuationModel(
             {(WITH_DOCUMENT, " is a film"): [-1.0], (HEAD, " is a film"): [-3.0]}
         )
 
@@ -228,5 +213,5 @@ class TestPMIEvidenceGainEstimator(unittest.TestCase):
             with self.subTest(temperature=temperature):
                 with self.assertRaisesRegex(ValueError, "temperature"):
                     PMIEvidenceGainEstimator(
-                        FakeLanguageModel(), temperature=temperature
+                        StoredContinuationModel(), temperature=temperature
                     )

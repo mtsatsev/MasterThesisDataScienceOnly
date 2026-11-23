@@ -1,15 +1,8 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import context_block
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, sigmoid
 from llm_bayesian_reasoning.records.atoms import Atom
-
-
-def _sigmoid(logit: float) -> float:
-    """Return 1 / (1 + e^-logit) without overflowing for large logits."""
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
 
 
 class PMIEvidenceGainEstimator:
@@ -23,10 +16,7 @@ class PMIEvidenceGainEstimator:
             temperature (float):
                 The divisor of the evidence gain, positive and finite.
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         self.language_model = language_model
         self.temperature = temperature
 
@@ -49,8 +39,7 @@ class PMIEvidenceGainEstimator:
         Returns:
             dict[str, float]: The probability that each atom holds.
         """
-        document = candidate.text.strip()
-        context = f"Context:\n{document}\n\n" if document else ""
+        context = context_block(candidate)
         requests = []
         for atom in atoms:
             before, _, after = atom.text.partition("{X}")
@@ -60,7 +49,7 @@ class PMIEvidenceGainEstimator:
 
         token_logprobs = self.language_model.continuation_token_logprobs(requests)
         return {
-            atom.name: _sigmoid(
+            atom.name: sigmoid(
                 (sum(token_logprobs[2 * index]) - sum(token_logprobs[2 * index + 1]))
                 / self.temperature
             )

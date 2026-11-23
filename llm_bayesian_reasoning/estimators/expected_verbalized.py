@@ -1,30 +1,21 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import (
+    context_block,
+    fill_entity,
+    question_prompt,
+)
+from llm_bayesian_reasoning.estimators.scoring import softmax
 from llm_bayesian_reasoning.records.atoms import Atom
 
 SCORE_TOKENS = [f" {score}" for score in range(11)]
 QUESTION = "On a scale from 0 to 10, how likely is it that the statement is true?"
 
 
-def _softmax(values: list[float]) -> list[float]:
-    """Return the softmax of the values, shifted by their maximum to stay finite."""
-    largest = max(values)
-    exponentials = [math.exp(value - largest) for value in values]
-    total = sum(exponentials)
-    return [exponential / total for exponential in exponentials]
-
-
 def _build_prompt(atom: Atom, candidate: Candidate) -> str:
     """Return the context block, entity, statement and the 0-10 question."""
-    document = candidate.text.strip()
-    context = f"Context:\n{document}\n\n" if document else ""
-    statement = atom.text.replace("{X}", repr(candidate.entity))
-    return (
-        f"{context}Entity: {candidate.entity!r}\n"
-        f"Statement: {statement}\n\n{QUESTION}\nAnswer:"
-    )
+    statement = fill_entity(atom.text, candidate)
+    return question_prompt(context_block(candidate), candidate, statement, QUESTION)
 
 
 class ExpectedVerbalizedEstimator:
@@ -60,7 +51,7 @@ class ExpectedVerbalizedEstimator:
         logprobs = self.language_model.next_token_logprobs(prompts, SCORE_TOKENS)
         probabilities = {}
         for atom, token_logprobs in zip(atoms, logprobs):
-            weights = _softmax([token_logprobs[token] for token in SCORE_TOKENS])
+            weights = softmax([token_logprobs[token] for token in SCORE_TOKENS])
             probabilities[atom.name] = sum(
                 score / 10 * weight for score, weight in enumerate(weights)
             )

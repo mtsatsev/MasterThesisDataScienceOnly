@@ -1,25 +1,13 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.prompts import fill_entity, question_prompt
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, sigmoid
 from llm_bayesian_reasoning.records.atoms import Atom
 
 YES_TOKEN = " yes"
 NO_TOKEN = " no"
 PRIOR_QUESTION = "Is the statement true?"
 ARTICLE_HEADER = "Wikipedia article:"
-
-
-def _sigmoid(logit: float) -> float:
-    """Return 1 / (1 + e^-logit) without overflowing for large logits."""
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
-
-
-def _statement(template: str, candidate: Candidate) -> str:
-    """Return an atom text or negated text with the entity filled in."""
-    return template.replace("{X}", repr(candidate.entity))
 
 
 class ChannelBayesFactorEstimator:
@@ -41,10 +29,7 @@ class ChannelBayesFactorEstimator:
             max_document_tokens (int):
                 How many leading document tokens are scored, at least 1.
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         if max_document_tokens < 1:
             raise ValueError(
                 f"max_document_tokens must be at least 1, got {max_document_tokens}"
@@ -74,9 +59,9 @@ class ChannelBayesFactorEstimator:
             dict[str, float]: The probability that each atom holds.
         """
         prior_prompts = [
-            f"Entity: {candidate.entity!r}\n"
-            f"Statement: {_statement(atom.text, candidate)}\n\n"
-            f"{PRIOR_QUESTION}\nAnswer:"
+            question_prompt(
+                "", candidate, fill_entity(atom.text, candidate), PRIOR_QUESTION
+            )
             for atom in atoms
         ]
         prior_logprobs = self.language_model.next_token_logprobs(
@@ -97,7 +82,7 @@ class ChannelBayesFactorEstimator:
             for atom in atoms:
                 for template in (atom.text, atom.negated_text):
                     fact = (
-                        f"Fact: {_statement(template, candidate)}.\n\n{ARTICLE_HEADER}"
+                        f"Fact: {fill_entity(template, candidate)}.\n\n{ARTICLE_HEADER}"
                     )
                     requests.append((fact, lead))
             token_logprobs = self.language_model.continuation_token_logprobs(requests)
@@ -107,6 +92,6 @@ class ChannelBayesFactorEstimator:
             ]
 
         return {
-            atom.name: _sigmoid(priors[index] + evidence[index] / self.temperature)
+            atom.name: sigmoid(priors[index] + evidence[index] / self.temperature)
             for index, atom in enumerate(atoms)
         }

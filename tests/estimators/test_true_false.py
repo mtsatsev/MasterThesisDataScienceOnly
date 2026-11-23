@@ -4,6 +4,7 @@ import unittest
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.true_false import TrueFalseEstimator
 from llm_bayesian_reasoning.records.atoms import Atom
+from tests.estimators.fake_language_models import FixedNextTokenModel
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
 AMERICAN = Atom(
@@ -16,19 +17,7 @@ CANDIDATE = Candidate(
 )
 QUESTION = "Is this phrase true or false?"
 
-
-class FakeLanguageModel:
-    """Return the same next-token log-probabilities for every prompt."""
-
-    def __init__(self, logprobs: dict[str, float] | None = None):
-        self.logprobs = logprobs or {" True": -1.0, " False": -2.0}
-        self.calls = []
-
-    def next_token_logprobs(
-        self, prompts: list[str], tokens: list[str]
-    ) -> list[dict[str, float]]:
-        self.calls.append((prompts, tokens))
-        return [{token: self.logprobs[token] for token in tokens} for _ in prompts]
+LOGPROBS = {" True": -1.0, " False": -2.0}
 
 
 def candidate(entity: str = "Blade Runner", text: str = CANDIDATE.text) -> Candidate:
@@ -41,8 +30,8 @@ class TestTrueFalseEstimator(unittest.TestCase):
         atoms: list[Atom],
         scored: Candidate = CANDIDATE,
         logprobs: dict[str, float] | None = None,
-    ) -> tuple[dict[str, float], FakeLanguageModel]:
-        language_model = FakeLanguageModel(logprobs)
+    ) -> tuple[dict[str, float], FixedNextTokenModel]:
+        language_model = FixedNextTokenModel(logprobs or LOGPROBS)
         result = TrueFalseEstimator(language_model).estimate_atoms(atoms, scored)
         return result, language_model
 

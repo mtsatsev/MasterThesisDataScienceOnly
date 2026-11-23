@@ -6,6 +6,7 @@ from llm_bayesian_reasoning.estimators.expected_verbalized import (
     ExpectedVerbalizedEstimator,
 )
 from llm_bayesian_reasoning.records.atoms import Atom
+from tests.estimators.fake_language_models import FixedNextTokenModel
 
 FILM = Atom(name="a0", text="{X} is a film", negated_text="{X} is not a film")
 AMERICAN = Atom(
@@ -33,18 +34,7 @@ def only(score: int) -> dict[str, float]:
     return {token: 0.0 if token == f" {score}" else -1000.0 for token in SCORE_TOKENS}
 
 
-class FakeLanguageModel:
-    """Return the same next-token log-probabilities for every prompt."""
-
-    def __init__(self, logprobs: dict[str, float] | None = None):
-        self.logprobs = logprobs or {token: -2.0 for token in SCORE_TOKENS}
-        self.calls = []
-
-    def next_token_logprobs(
-        self, prompts: list[str], tokens: list[str]
-    ) -> list[dict[str, float]]:
-        self.calls.append((prompts, tokens))
-        return [{token: self.logprobs[token] for token in tokens} for _ in prompts]
+LOGPROBS = {token: -2.0 for token in SCORE_TOKENS}
 
 
 def candidate(entity: str = "Blade Runner", text: str = CANDIDATE.text) -> Candidate:
@@ -57,8 +47,8 @@ class TestExpectedVerbalizedEstimator(unittest.TestCase):
         atoms: list[Atom],
         scored: Candidate = CANDIDATE,
         logprobs: dict[str, float] | None = None,
-    ) -> tuple[dict[str, float], FakeLanguageModel]:
-        language_model = FakeLanguageModel(logprobs)
+    ) -> tuple[dict[str, float], FixedNextTokenModel]:
+        language_model = FixedNextTokenModel(logprobs or LOGPROBS)
         estimator = ExpectedVerbalizedEstimator(language_model)
         return estimator.estimate_atoms(atoms, scored), language_model
 

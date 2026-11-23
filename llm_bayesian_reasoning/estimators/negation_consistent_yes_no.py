@@ -1,20 +1,12 @@
-import math
-
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
 from llm_bayesian_reasoning.estimators.language_model import LanguageModel
+from llm_bayesian_reasoning.estimators.scoring import check_temperature, sigmoid
 from llm_bayesian_reasoning.estimators.yes_no import (
     NO_TOKEN,
     YES_TOKEN,
     build_yes_no_prompt,
 )
 from llm_bayesian_reasoning.records.atoms import Atom
-
-
-def _sigmoid(logit: float) -> float:
-    """Return 1 / (1 + e^-logit) without overflowing for large logits."""
-    if logit >= 0:
-        return 1 / (1 + math.exp(-logit))
-    return math.exp(logit) / (1 + math.exp(logit))
 
 
 class NegationConsistentYesNoEstimator:
@@ -28,10 +20,7 @@ class NegationConsistentYesNoEstimator:
             temperature (float):
                 The divisor of each yes/no gap, positive and finite.
         """
-        if not (math.isfinite(temperature) and temperature > 0):
-            raise ValueError(
-                f"temperature must be positive and finite, got {temperature}"
-            )
+        check_temperature(temperature)
         self.language_model = language_model
         self.temperature = temperature
 
@@ -66,7 +55,7 @@ class NegationConsistentYesNoEstimator:
             for token_logprobs in logprobs
         ]
         return {
-            atom.name: _sigmoid(
+            atom.name: sigmoid(
                 (gaps[2 * index] - gaps[2 * index + 1]) / (2 * self.temperature)
             )
             for index, atom in enumerate(atoms)
