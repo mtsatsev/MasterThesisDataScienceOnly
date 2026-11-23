@@ -5,6 +5,10 @@ from typing import Protocol
 import numpy as np
 
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
+from llm_bayesian_reasoning.retrievers.top_candidates import (
+    check_top_n,
+    top_candidates,
+)
 
 
 class QueryEncoder(Protocol):
@@ -62,16 +66,7 @@ class E5Retriever:
         Returns:
             list[Candidate]: The documents, with their cosine similarity as score.
         """
-        if top_n < 1:
-            raise ValueError(f"top_n must be at least 1, got {top_n}")
+        check_top_n(top_n)
         query_vector = self.query_encoder.encode([f"query: {query}"])[0]
         scores = self.embeddings @ (query_vector / np.linalg.norm(query_vector))
-        best = np.argsort(-scores, kind="stable")[:top_n]
-        return [
-            Candidate(
-                entity=self.titles[index],
-                text=self.texts[index],
-                retrieval_score=float(scores[index]),
-            )
-            for index in best
-        ]
+        return top_candidates(scores, self.titles, self.texts, top_n)

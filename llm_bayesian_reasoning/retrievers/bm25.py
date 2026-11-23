@@ -3,18 +3,21 @@ from pathlib import Path
 from typing import cast
 
 import bm25s
-import numpy as np
 
 from llm_bayesian_reasoning.estimators.atom_estimator import Candidate
+from llm_bayesian_reasoning.retrievers.top_candidates import (
+    check_top_n,
+    top_candidates,
+)
 
 
 def _tokenize_documents(texts: list[str]) -> bm25s.tokenization.Tokenized:
     """
     Lowercase the texts and split them into word ids, without English stopwords.
-    
+
     Args:
         texts (list[str]): The documents to tokenize.
-    
+
     Returns:
         bm25s.tokenization.Tokenized: The tokenized documents.
     """
@@ -94,19 +97,10 @@ class BM25Retriever:
         Returns:
             list[Candidate]: The documents, with their BM25 score.
         """
-        if top_n < 1:
-            raise ValueError(f"top_n must be at least 1, got {top_n}")
+        check_top_n(top_n)
         tokens = _tokenize_query(query)
         if not tokens:
             raise ValueError(f"Query {query!r} has no searchable words")
 
         scores = self.model.get_scores(tokens)
-        best = np.argsort(-scores, kind="stable")[:top_n]
-        return [
-            Candidate(
-                entity=self.titles[index],
-                text=self.texts[index],
-                retrieval_score=float(scores[index]),
-            )
-            for index in best
-        ]
+        return top_candidates(scores, self.titles, self.texts, top_n)
